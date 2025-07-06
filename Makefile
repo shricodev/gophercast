@@ -4,7 +4,6 @@ build:
 run: build
 	@./bin/gophercast
 
-
 serve: build
 	@./bin/gophercast serve --dir-to-mp3 ~/Music
 
