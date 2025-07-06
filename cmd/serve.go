@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/shricodev/gophercast/pkg/types"
+	"github.com/shricodev/gophercast/tui"
 )
 
 var (
@@ -27,7 +28,6 @@ either provide a local mp3 file, a directory with list of mp3 files, or a
 youtube URL or a youtube playlist URL.
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("serve called")
 		switch {
 		case dirToMP3 != "":
 			fmt.Println(dirToMP3)
@@ -36,15 +36,14 @@ youtube URL or a youtube playlist URL.
 		case ytPlaylist != "":
 			fmt.Println(ytPlaylist)
 		default:
-			fmt.Println("Invalid arguments")
+			d, y, p := tui.Run()
+			fmt.Println(d, y, p)
 		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(serveCmd)
-
-	// Here you will define your flags and configuration settings.
 
 	sourceLocalDirStr := types.SourceLocalDir.String()
 	sourceYoutubeStr := types.SourceYoutube.String()
@@ -56,7 +55,7 @@ func init() {
 	serveCmd.Flags().StringVarP(&ytURL, sourceYoutubeStr, "y", "", "Link to the youtube video")
 	serveCmd.Flags().StringVarP(&ytPlaylist, sourceYoutubePlaylistStr, "p", "", "Link to the youtube playlist")
 
-	serveCmd.MarkFlagsOneRequired(sourceLocalDirStr, sourceYoutubeStr, sourceYoutubePlaylistStr)
+	// serveCmd.MarkFlagsOneRequired(sourceLocalDirStr, sourceYoutubeStr, sourceYoutubePlaylistStr)
 	serveCmd.MarkFlagsMutuallyExclusive(sourceLocalDirStr, sourceYoutubeStr, sourceYoutubePlaylistStr)
 
 	// Cobra supports local flags which will only run when this command
