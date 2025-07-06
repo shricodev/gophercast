@@ -7,5 +7,8 @@ run:
 fmt:
 	go fmt ./...
 
+test:
+	go test ./...
+
 # install-deps:
 		# In future

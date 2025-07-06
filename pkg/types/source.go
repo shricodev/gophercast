@@ -3,7 +3,7 @@ package types
 type Source string
 
 const (
-	SourceLocal           Source = "local"
+	SourceLocalDir        Source = "dir-to-mp3"
 	SourceYoutube         Source = "youtube"
 	SourceYoutubePlaylist Source = "yt-playlist"
 )
@@ -14,7 +14,7 @@ func (s Source) String() string {
 
 func (s Source) IsValid() bool {
 	switch s {
-	case SourceLocal, SourceYoutube, SourceYoutubePlaylist:
+	case SourceLocalDir, SourceYoutube, SourceYoutubePlaylist:
 		return true
 	default:
 		return false
