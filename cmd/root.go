@@ -31,10 +31,9 @@ var cfgFile string
 var rootCmd = &cobra.Command{
 	Use:   "gophercast",
 	Short: "Radio like audio streaming over clients connected in a LAN",
-	Long: `
-	This is mainly used to play stream audio files in a LAN network in all the
-	devices that are connected to the server. Mainly used for music
-	synchronization play in multiple devices that works as a speaker.
+	Long: `This is mainly used to play stream audio files in a LAN network in all the
+devices that are connected to the server. Mainly used for music
+synchronization play in multiple devices that works as a speaker.
 	`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
