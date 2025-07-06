@@ -25,11 +25,10 @@ func buildPlaylistFromFS(fsys fs.FS, root types.Path) (types.Playlist, error) {
 			return nil
 		}
 
-		fullPath := filepath.Join(root.String(), path)
-		p := types.Path(fullPath)
-		// if err != nil {
-		// 	return err
-		// }
+		p, err := types.NewPathInFS(fsys, path, root)
+		if err != nil {
+			return err
+		}
 
 		tracks = append(tracks, types.Track{
 			Title:  d.Name(),

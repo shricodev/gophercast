@@ -1,14 +1,24 @@
 build:
-	go build -o bin/gophercast main.go
+	@go build -o bin/gophercast main.go
 
-run:
-	go run main.go serve --dir ~/Music
+run: build
+	@./bin/gophercast
+
+
+serve: build
+	@./bin/gophercast serve --dir-to-mp3 ~/Music
 
 fmt:
 	go fmt ./...
 
 test:
 	go test ./...
+
+test-verbose:
+	go test -v ./...
+
+clean:
+	rm -f bin/gophercast
 
 # install-deps:
 		# In future

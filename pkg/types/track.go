@@ -1,7 +1,7 @@
 package types
 
 import (
-	"errors"
+	"fmt"
 	"time"
 )
 
@@ -15,11 +15,11 @@ type Track struct {
 
 func (t Track) Validate() error {
 	if !t.Source.IsValid() {
-		return errors.New("invalid source type:" + t.Source.String())
+		return fmt.Errorf("invalid source type: %s", t.Source.String())
 	}
 
 	if !t.Path.Exists() {
-		return errors.New("invalid path:" + t.Path.String())
+		return fmt.Errorf("invalid path: %s", t.Path.String())
 	}
 
 	return nil

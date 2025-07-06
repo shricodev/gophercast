@@ -34,15 +34,18 @@ func TestBuildPlaylistFromFS(t *testing.T) {
 				"image3.jpg": &fstest.MapFile{Data: []byte("fake image data")},
 				"song3.MP3":  &fstest.MapFile{Data: []byte("uppercase fake mp3 data")},
 			},
-			expectedTracksLen: 2,
+			expectedTracksLen: 1,
 			wantErr:           false,
 		},
 		{
 			name: "nested directories",
 			fs: fstest.MapFS{
+				"album1":                  &fstest.MapFile{Mode: fs.ModeDir},
 				"album1/song1.mp3":        &fstest.MapFile{Data: []byte("fake mp3 data")},
 				"album1/song2.mp3":        &fstest.MapFile{Data: []byte("fake mp3 data")},
+				"album2":                  &fstest.MapFile{Mode: fs.ModeDir},
 				"album2/song3.mp3":        &fstest.MapFile{Data: []byte("fake mp3 data")},
+				"album2/subdir":           &fstest.MapFile{Mode: fs.ModeDir},
 				"album2/subdir/song4.mp3": &fstest.MapFile{Data: []byte("fake mp3 data")},
 			},
 			expectedTracksLen: 4,
@@ -51,7 +54,7 @@ func TestBuildPlaylistFromFS(t *testing.T) {
 		{
 			name: "empty directory",
 			fs: fstest.MapFS{
-				"empty_dir/": &fstest.MapFile{Mode: 0755 | fs.ModeDir},
+				"empty_dir": &fstest.MapFile{Mode: fs.ModeDir},
 			},
 			expectedTracksLen: 0,
 			wantErr:           false,

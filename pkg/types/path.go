@@ -2,7 +2,8 @@
 package types
 
 import (
-	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -16,7 +17,21 @@ func NewPath(s string) (Path, error) {
 	}
 
 	if _, err := os.Stat(abs); err != nil {
-		return "", errors.New("invalid path: " + err.Error())
+		return "", fmt.Errorf("invalid path: %w", err)
+	}
+
+	return Path(abs), nil
+}
+
+func NewPathInFS(fsys fs.FS, relativePath string, root Path) (Path, error) {
+	if _, err := fs.Stat(fsys, relativePath); err != nil {
+		return "", fmt.Errorf("path does not exist in the filesystem: %w", err)
+	}
+
+	fullPath := filepath.Join(root.String(), relativePath)
+	abs, err := filepath.Abs(fullPath)
+	if err != nil {
+		return "", err
 	}
 
 	return Path(abs), nil
