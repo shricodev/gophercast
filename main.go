@@ -1,5 +1,12 @@
 package main
 
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/shricodev/gophercast/server"
+)
+
 /*
 Copyright © 2025 shrijal.acharya@gmail.com
 
@@ -16,13 +23,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import "github.com/shricodev/gophercast/cmd"
+// import "github.com/shricodev/gophercast/cmd"
 
 func main() {
-	cmd.Execute()
-	// p := tea.NewProgram(tui.InitialModel())
-	// if _, err := p.Run(); err != nil {
-	// 	fmt.Printf("Alas, there's been an error: %v", err)
-	// 	os.Exit(1)
-	// }
+	// cmd.Execute()
+
+	filename := "audiofile.wav"
+
+	server := server.NewAudioServer(filename)
+	go server.Run()
+
+	http.HandleFunc("/ws", server.HandleWebSocket)
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		fmt.Println("error listening on the server:", err)
+	}
 }
