@@ -1,10 +1,7 @@
 package main
 
 import (
-	"fmt"
-	"net/http"
-
-	"github.com/shricodev/gophercast/server"
+	"github.com/shricodev/gophercast/cmd"
 )
 
 /*
@@ -26,15 +23,15 @@ limitations under the License.
 // import "github.com/shricodev/gophercast/cmd"
 
 func main() {
-	// cmd.Execute()
+	cmd.Execute()
 
-	filename := "audiofile.wav"
-
-	server := server.NewAudioServer(filename)
-	go server.Run()
-
-	http.HandleFunc("/ws", server.HandleWebSocket)
-	if err := http.ListenAndServe(":8080", nil); err != nil {
-		fmt.Println("error listening on the server:", err)
-	}
+	// filename := "audiofile.wav"
+	//
+	// server := server.NewAudioServer(filename)
+	// go server.Run()
+	//
+	// http.HandleFunc("/ws", server.HandleWebSocket)
+	// if err := http.ListenAndServe(":8080", nil); err != nil {
+	// 	fmt.Println("error listening on the server:", err)
+	// }
 }

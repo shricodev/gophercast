@@ -5,9 +5,11 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/charmbracelet/bubbles/filepicker"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -42,10 +44,19 @@ func (i item) Description() string { return i.desc }
 
 func (i item) FilterValue() string { return i.title }
 
-type model struct {
-	state screen
+type serverStartedMsg struct{}
 
-	list list.Model
+type errMsg struct{ err error }
+
+// Implements the error interface.
+func (e errMsg) Error() string {
+	return e.err.Error()
+}
+
+type model struct {
+	state   screen
+	list    list.Model
+	spinner spinner.Model
 
 	filePicker filepicker.Model
 	textInput  textinput.Model
@@ -56,10 +67,11 @@ type model struct {
 
 	width  int
 	height int
+	err    error
 }
 
 func (m model) Init() tea.Cmd {
-	return nil
+	return m.spinner.Tick
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -76,9 +88,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				switch selectedItem.title {
 				case "Directory":
 					m.state = screenPickDir
-					m.filePicker.AllowedTypes = []string{}
-					m.filePicker.DirAllowed = true
-					m.filePicker.FileAllowed = false
 					return m, m.filePicker.Init()
 				case "YouTube":
 					m.state = screenInputYoutube
@@ -99,7 +108,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if info, err := os.Stat(selectedPath); err == nil && info.IsDir() {
 						m.dirPath = types.Path(selectedPath)
 						m.state = screenServerStarting
-						return m, nil
+						return m, tea.Batch(m.spinner.Tick, startServer)
 					}
 				}
 			} else if msg.String() == "d" {
@@ -107,7 +116,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if currentDir != "" {
 					m.dirPath = types.Path(currentDir)
 					m.state = screenServerStarting
-					return m, nil
+					return m, tea.Batch(m.spinner.Tick, startServer)
 				}
 			}
 		case screenInputYoutube:
@@ -115,7 +124,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.textInput.Value() != "" {
 					m.youtubeURL = m.textInput.Value()
 					m.state = screenServerStarting
-					return m, nil
+					return m, tea.Batch(m.spinner.Tick, startServer)
 				}
 			}
 		case screenInputPlaylist:
@@ -123,12 +132,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.textInput.Value() != "" {
 					m.youtubePlaylistURL = m.textInput.Value()
 					m.state = screenServerStarting
-					return m, nil
+					return m, tea.Batch(m.spinner.Tick, startServer)
 				}
 			}
-		case screenServerStarting:
-			m.state = screenServerRunning
-			return m, nil
 		}
 
 		if msg.String() == "esc" && m.state != screenMenu {
@@ -142,22 +148,41 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		h, v := docStyle.GetFrameSize()
 		m.list.SetSize(msg.Width-h, msg.Height-v-10)
 		m.filePicker.SetHeight(10)
+
+	case serverStartedMsg:
+		m.state = screenServerRunning
+		return m, nil
+
+	case errMsg:
+		m.err = msg
+		return m, tea.Quit
 	}
 
 	var cmd tea.Cmd
+	var cmds []tea.Cmd
 	switch m.state {
 	case screenMenu:
 		m.list, cmd = m.list.Update(msg)
+		cmds = append(cmds, cmd)
 	case screenPickDir:
 		m.filePicker, cmd = m.filePicker.Update(msg)
+		cmds = append(cmds, cmd)
 	case screenInputYoutube, screenInputPlaylist:
 		m.textInput, cmd = m.textInput.Update(msg)
+		cmds = append(cmds, cmd)
+	case screenServerStarting:
+		m.spinner, cmd = m.spinner.Update(msg)
+		cmds = append(cmds, cmd)
 	}
 
-	return m, cmd
+	return m, tea.Batch(cmds...)
 }
 
 func (m model) View() string {
+	if m.err != nil {
+		return "Error: " + m.err.Error()
+	}
+
 	var s string
 
 	options := figlet4go.NewRenderOptions()
@@ -182,7 +207,7 @@ func (m model) View() string {
 	case screenInputPlaylist:
 		s += "Enter YouTube Playlist URL:\n\n" + m.textInput.View() + "\n\n" + helpStyle.Render("Press Enter to confirm, Esc to go back")
 	case screenServerStarting:
-		s += "Starting server..."
+		s += m.spinner.View() + " Starting work, please wait..."
 	case screenServerRunning:
 		s += "Server running!\n\nCtrl+C to quit."
 	}
@@ -207,7 +232,7 @@ func InitialModel() model {
 	fp.ShowHidden = false
 	fp.SetHeight(10)
 
-	// Set initial directory to ~/Music if it exists, otherwise /home
+	// Set initial directory to ~/Music if it exists, otherwise /home/<username>
 	homeDir, err := os.UserHomeDir()
 	if err == nil {
 		musicDir := filepath.Join(homeDir, "Music")
@@ -222,12 +247,23 @@ func InitialModel() model {
 	ti.CharLimit = 500
 	ti.Width = 50
 
+	s := spinner.New()
+	s.Spinner = spinner.Monkey
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+
 	return model{
 		list:       l,
 		state:      screenMenu,
 		filePicker: fp,
 		textInput:  ti,
+		spinner:    s,
 	}
+}
+
+func startServer() tea.Msg {
+	// perform the actual work
+	time.Sleep(2 * time.Second)
+	return serverStartedMsg{}
 }
 
 func Run() (types.Path, string, string) {
@@ -242,4 +278,3 @@ func Run() (types.Path, string, string) {
 	mo := finalModel.(model)
 	return mo.dirPath, mo.youtubePlaylistURL, mo.youtubeURL
 }
-
