@@ -136,18 +136,11 @@ func (c *Client) readMessages() {
 func (c *Client) writeMessages() {
 	defer c.conn.Close()
 
-	for {
-		select {
-		case audioData, ok := <-c.send:
-			if !ok {
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
-				return
-			}
-
-			if err := c.conn.WriteMessage(websocket.BinaryMessage, audioData); err != nil {
-				fmt.Printf("error writing message: %v\n", err)
-				return
-			}
+	for audioData := range c.send {
+		err := c.conn.WriteMessage(websocket.BinaryMessage, audioData)
+		if err != nil {
+			fmt.Printf("error writing message: %v\n", err)
+			return
 		}
 	}
 }
