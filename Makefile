@@ -18,6 +18,3 @@ test-verbose:
 
 clean:
 	rm -f bin/gophercast
-
-# install-deps:
-		# In future

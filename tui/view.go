@@ -56,7 +56,13 @@ func (m model) View() string {
 			helpStyle.Render("Enter: Confirm, Esc: Back"),
 		)
 	case screenAppStarting:
-		body = m.spinner.View() + " " + "Starting work, please wait..."
+		message := "Starting work, please wait..."
+		if m.youtubeURL != "" {
+			message = "Downloading YouTube video, please wait..."
+		} else if m.youtubePlaylistURL != "" {
+			message = "Downloading YouTube playlist, please wait..."
+		}
+		body = m.spinner.View() + " " + message
 	case screenAppRunning:
 		body = lipgloss.JoinVertical(lipgloss.Left,
 			"Server running!",

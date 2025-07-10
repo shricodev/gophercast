@@ -36,8 +36,8 @@ youtube URL or a youtube playlist URL.
 		case ytPlaylist != "":
 			fmt.Println(ytPlaylist)
 		default:
-			d, y, p := tui.Start()
-			fmt.Println(d, y, p)
+			_, _, _ = tui.Start()
+			// fmt.Println(d, y, p)
 		}
 	},
 }

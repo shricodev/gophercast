@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/shricodev/gophercast/internal/downloader"
 	"github.com/shricodev/gophercast/pkg/types"
 )
 
@@ -24,6 +25,8 @@ type model struct {
 	dirPath            types.Path
 	youtubeURL         string
 	youtubePlaylistURL string
+	downloadedTracks   types.Playlist
+	downloadConfig     *downloader.DownloadConfig
 
 	err error
 }
@@ -73,13 +76,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.textInput.Value() != "" {
 					m.youtubeURL = m.textInput.Value()
 					m.state = screenAppStarting
-					return m, tea.Batch(m.spinner.Tick, run)
+					return m, tea.Batch(m.spinner.Tick, downloadYouTubeVideo(m.youtubeURL, m.downloadConfig))
 				}
 			case screenInputPlaylist:
 				if m.textInput.Value() != "" {
 					m.youtubePlaylistURL = m.textInput.Value()
 					m.state = screenAppStarting
-					return m, tea.Batch(m.spinner.Tick, run)
+					return m, tea.Batch(m.spinner.Tick, downloadYouTubePlaylist(m.youtubePlaylistURL, m.downloadConfig))
 				}
 			}
 
@@ -112,6 +115,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.filePicker.SetHeight(msg.Height - 40)
 
 	case appStartedMsg:
+		m.state = screenAppRunning
+		return m, nil
+
+	case downloadCompleteMsg:
+		m.downloadedTracks = msg.tracks
+		m.dirPath = msg.path
 		m.state = screenAppRunning
 		return m, nil
 
@@ -172,11 +181,12 @@ func InitialModel() model {
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	return model{
-		list:       l,
-		state:      screenMenu,
-		filePicker: fp,
-		textInput:  ti,
-		spinner:    s,
+		list:           l,
+		state:          screenMenu,
+		filePicker:     fp,
+		textInput:      ti,
+		spinner:        s,
+		downloadConfig: downloader.DefaultConfig(),
 	}
 }
 
@@ -187,11 +197,11 @@ type item struct {
 	title, desc string
 }
 
-// Title() satisfies the list.Item interface
+// Title satisfies the list.Item interface
 func (i item) Title() string { return i.title }
 
-// Description() satisfies the list.Item interface
+// Description satisfies the list.Item interface
 func (i item) Description() string { return i.desc }
 
-// FilterValue() satisfies the list.Item interface
+// FilterValue satisfies the list.Item interface
 func (i item) FilterValue() string { return i.title }
