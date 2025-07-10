@@ -16,27 +16,6 @@ var (
 	helpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Padding(1, 0)
 )
 
-type screen int
-
-const (
-	screenMenu screen = iota
-	screenPickDir
-	screenInputYoutube
-	screenInputPlaylist
-	screenAppStarting
-	screenAppRunning
-)
-
-type item struct {
-	title, desc string
-}
-
-func (i item) Title() string { return i.title }
-
-func (i item) Description() string { return i.desc }
-
-func (i item) FilterValue() string { return i.title }
-
 type appStartedMsg struct{}
 
 type errMsg struct{ err error }

@@ -17,8 +17,8 @@ func (m model) View() string {
 	content, err := os.ReadFile(bannerPath)
 	if err != nil {
 		content = []byte(`
-█▀▀ █▀█ █▀█ █░█ █▀▀ █▀█ █▀▀ ▄▀█ █▀ ▀█▀
-█▄█ █▄█ █▀▀ █▀█ ██▄ █▀▄ █▄▄ █▀█ ▄█ ░█░
+█▀▀ █▀█ █▀█ █ █ █▀▀ █▀█ █▀▀ ▄▀█ █▀ ▀█▀
+█▄█ █▄█ █▀▀ █▀█ ██▄ █▀▄ █▄▄ █▀█ ▄█  █ 
 		`)
 	}
 
@@ -26,27 +26,45 @@ func (m model) View() string {
 		Foreground(lipgloss.Color("241")).
 		Render("Built with 🤍 by Shrijal Acharya @shricodev")
 
-	header := color.CyanString(string(content) + "\n" + message)
+	header := color.CyanString(lipgloss.JoinVertical(lipgloss.Left, string(content), message))
 
 	var body string
 	switch m.state {
 	case screenMenu:
 		body = m.list.View()
 	case screenPickDir:
-		body = "Choose a directory:\n\n" + m.filePicker.View() + "\n" +
-			helpStyle.Render("↑/↓: Navigate, Enter: Select, d: Select current, Esc: Back")
+		body = lipgloss.JoinVertical(lipgloss.Left,
+			"Choose a directory:",
+			"",
+			m.filePicker.View(),
+			helpStyle.Render("↑/↓ j/k: Navigate, Enter: Select, d: Select cwd, Esc: Back"),
+		)
 	case screenInputYoutube:
-		body = "Enter YouTube URL:\n\n" + m.textInput.View() + "\n\n" +
-			helpStyle.Render("Press Enter to confirm, Esc to go back")
+		body = lipgloss.JoinVertical(lipgloss.Left,
+			"Enter YouTube URL:",
+			"",
+			m.textInput.View(),
+			"",
+			helpStyle.Render("Enter: Confirm, Esc: Back"),
+		)
 	case screenInputPlaylist:
-		body = "Enter YouTube Playlist URL:\n\n" + m.textInput.View() + "\n\n" +
-			helpStyle.Render("Press Enter to confirm, Esc to go back")
+		body = lipgloss.JoinVertical(lipgloss.Left,
+			"Enter YouTube Playlist URL:",
+			"",
+			m.textInput.View(),
+			"",
+			helpStyle.Render("Enter: Confirm, Esc: Back"),
+		)
 	case screenAppStarting:
 		body = m.spinner.View() + " " + "Starting work, please wait..."
 	case screenAppRunning:
-		body = "Server running!\n\n" + helpStyle.Render("Press Ctrl + C to exit")
+		body = lipgloss.JoinVertical(lipgloss.Left,
+			"Server running!",
+			"",
+			helpStyle.Render("Press Ctrl + C to exit"),
+		)
 	}
 
-	full := header + "\n\n" + body + "\n\n"
+	full := lipgloss.JoinVertical(lipgloss.Left, header, "", body, "", "")
 	return docStyle.Render(full)
 }

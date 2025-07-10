@@ -35,32 +35,32 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if msg.String() == "ctrl+c" {
-			return m, tea.Quit
-		}
+		key := msg.String()
 
-		switch m.state {
-		case screenMenu:
-			if msg.String() == "enter" {
+		switch key {
+		case "ctrl+c":
+			return m, tea.Quit
+
+		case "enter":
+			switch m.state {
+			case screenMenu:
 				selectedItem := m.list.SelectedItem().(item)
 				switch selectedItem.title {
-				case "Directory":
+				case directory:
 					m.state = screenPickDir
 					return m, m.filePicker.Init()
-				case "YouTube":
+				case youtube:
 					m.state = screenInputYoutube
 					m.textInput.Placeholder = "Enter YouTube URL..."
 					m.textInput.Focus()
 					return m, textinput.Blink
-				case "Playlist":
+				case youtubePlaylist:
 					m.state = screenInputPlaylist
 					m.textInput.Placeholder = "Enter YouTube playlist URL..."
 					m.textInput.Focus()
 					return m, textinput.Blink
 				}
-			}
-		case screenPickDir:
-			if msg.String() == "enter" {
+			case screenPickDir:
 				selectedPath := m.filePicker.Path
 				if selectedPath != "" {
 					if info, err := os.Stat(selectedPath); err == nil && info.IsDir() {
@@ -69,7 +69,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, tea.Batch(m.spinner.Tick, run)
 					}
 				}
-			} else if msg.String() == "d" {
+			case screenInputYoutube:
+				if m.textInput.Value() != "" {
+					m.youtubeURL = m.textInput.Value()
+					m.state = screenAppStarting
+					return m, tea.Batch(m.spinner.Tick, run)
+				}
+			case screenInputPlaylist:
+				if m.textInput.Value() != "" {
+					m.youtubePlaylistURL = m.textInput.Value()
+					m.state = screenAppStarting
+					return m, tea.Batch(m.spinner.Tick, run)
+				}
+			}
+
+		case "d":
+			if m.state == screenPickDir {
 				currentDir := m.filePicker.CurrentDirectory
 				if currentDir != "" {
 					m.dirPath = types.Path(currentDir)
@@ -77,33 +92,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, tea.Batch(m.spinner.Tick, run)
 				}
 			}
-		case screenInputYoutube:
-			if msg.String() == "enter" {
-				if m.textInput.Value() != "" {
-					m.youtubeURL = m.textInput.Value()
-					m.state = screenAppStarting
-					return m, tea.Batch(m.spinner.Tick, run)
-				}
-			}
-		case screenInputPlaylist:
-			if msg.String() == "enter" {
-				if m.textInput.Value() != "" {
-					m.youtubePlaylistURL = m.textInput.Value()
-					m.state = screenAppStarting
-					return m, tea.Batch(m.spinner.Tick, run)
-				}
-			}
-		}
 
-		if msg.String() == "esc" && m.state != screenMenu {
-			m.state = screenMenu
-			return m, nil
+		case "esc":
+			if m.state != screenMenu && m.state != screenAppRunning {
+				m.state = screenMenu
+				return m, nil
+			}
 		}
 
 	case tea.WindowSizeMsg:
-		h, v := docStyle.GetFrameSize()
-		m.list.SetSize(msg.Width-h, msg.Height-v-10)
-		// m.filePicker.SetHeight(10)
+		hor, ver := docStyle.GetFrameSize()
+
+		// Removing -30 after removing the vertical margin seems to work well
+		// with the UI. This is a completely arbitrary value.
+		m.list.SetSize(msg.Width-hor, msg.Height-ver-30)
+
+		// Here again, arbitrary values. Subtracting 40 from the height makes
+		// it look nice in the UI.
+		m.filePicker.SetHeight(msg.Height - 40)
 
 	case appStartedMsg:
 		m.state = screenAppRunning
@@ -114,8 +120,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 
+	// Update bubble components
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
+
 	switch m.state {
 	case screenMenu:
 		m.list, cmd = m.list.Update(msg)
@@ -134,22 +142,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+// InitialModel returns the initial model for the application.
 func InitialModel() model {
 	items := []list.Item{
-		item{title: "Directory", desc: "Pick a directory with mp3 files"},
-		item{title: "YouTube", desc: "Provide a YouTube video URL"},
-		item{title: "Playlist", desc: "Provide a YouTube playlist URL"},
+		item{title: directory, desc: "Pick a directory with mp3 files"},
+		item{title: youtube, desc: "Provide a YouTube video URL"},
+		item{title: youtubePlaylist, desc: "Provide a YouTube playlist URL"},
 	}
 
 	l := list.New(items, list.NewDefaultDelegate(), 0, 0)
 	l.Title = "Select source"
 
-	// Set up file picker with initial directory
 	fp := filepicker.New()
 	fp.DirAllowed = true
 	fp.FileAllowed = false
 	fp.ShowHidden = false
-	fp.SetHeight(10)
 
 	homeDir, err := os.UserHomeDir()
 	if err == nil {
@@ -172,3 +179,19 @@ func InitialModel() model {
 		spinner:    s,
 	}
 }
+
+// item is an item in the list that holds the title and the description. This
+// is what's shown in the initial page when the application runs with the serve
+// subcommand
+type item struct {
+	title, desc string
+}
+
+// Title() satisfies the list.Item interface
+func (i item) Title() string { return i.title }
+
+// Description() satisfies the list.Item interface
+func (i item) Description() string { return i.desc }
+
+// FilterValue() satisfies the list.Item interface
+func (i item) FilterValue() string { return i.title }
