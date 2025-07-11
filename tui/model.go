@@ -112,7 +112,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Here again, arbitrary values. Subtracting 40 from the height makes
 		// it look nice in the UI.
+		// FIX: When the window is resize, or the font is changed, the height
+		// of the picker grows super huge (might be an issue with bubble
+		// itself, or I'm not correct).
 		m.filePicker.SetHeight(msg.Height - 40)
+		// m.filePicker.SetHeight(10)
 
 	case appStartedMsg:
 		m.state = screenAppRunning

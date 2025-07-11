@@ -2,6 +2,7 @@
 package downloader
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -66,13 +67,13 @@ func DownloadVideo(url string, config *DownloadConfig) (types.Track, error) {
 	}
 
 	if err := ensureDir(config.OutputDir); err != nil {
-		return types.Track{}, fmt.Errorf("failed to create output directory: %v", err)
+		return types.Track{}, fmt.Errorf("failed to create output directory: %w", err)
 	}
 
 	infoCmd := exec.Command("yt-dlp", "--get-title", url)
 	titleBytes, err := infoCmd.Output()
 	if err != nil {
-		return types.Track{}, fmt.Errorf("failed to get video info: %v", err)
+		return types.Track{}, fmt.Errorf("failed to get video info: %w", err)
 	}
 
 	title := strings.TrimSpace(string(titleBytes))
@@ -88,7 +89,7 @@ func DownloadVideo(url string, config *DownloadConfig) (types.Track, error) {
 		url)
 
 	if err := cmd.Run(); err != nil {
-		return types.Track{}, fmt.Errorf("failed to download video: %v", err)
+		return types.Track{}, fmt.Errorf("failed to download video: %w", err)
 	}
 
 	track := types.Track{
@@ -105,18 +106,33 @@ func DownloadPlaylist(url string, config *DownloadConfig) (types.Playlist, error
 		return nil, err
 	}
 
-	infoCmd := exec.Command("yt-dlp", "--get-filename", "--print", "playlist_title", url)
-	titleBytes, err := infoCmd.Output()
+	infoCmd := exec.Command("yt-dlp",
+		"--flat-playlist",
+		"--no-warnings",
+		"--dump-single-json",
+		url,
+	)
+	jsonOutput, err := infoCmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get playlist info: %v", err)
+		return nil, fmt.Errorf("failed to get playlist info: %w", err)
 	}
 
-	playlistTitle := strings.TrimSpace(string(titleBytes))
+	var info struct {
+		Title string `json:"title"`
+	}
+	if err := json.Unmarshal(jsonOutput, &info); err != nil {
+		return nil, fmt.Errorf("failed to parse playlist JSON from yt-dlp: %w", err)
+	}
+	playlistTitle := info.Title
+	if playlistTitle == "" {
+		return nil, fmt.Errorf("could not find playlist title in yt-dlp output")
+	}
+
 	sanitizedPlaylistTitle := sanitizeFilename(playlistTitle)
 
 	playlistDir := filepath.Join(config.OutputDir, sanitizedPlaylistTitle)
 	if err := ensureDir(playlistDir); err != nil {
-		return nil, fmt.Errorf("failed to create playlist directory: %v", err)
+		return nil, fmt.Errorf("failed to create playlist directory: %w", err)
 	}
 
 	outputTemplate := filepath.Join(playlistDir, "%(title)s.%(ext)s")
@@ -128,7 +144,7 @@ func DownloadPlaylist(url string, config *DownloadConfig) (types.Playlist, error
 		url)
 
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("failed to download playlist: %v", err)
+		return nil, fmt.Errorf("failed to download playlist: %w", err)
 	}
 
 	return playlist.BuildPlaylistFromDir(types.Path(playlistDir))

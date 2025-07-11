@@ -2,13 +2,6 @@ package main
 
 import "github.com/shricodev/gophercast/cmd"
 
-// import (
-// 	"fmt"
-// 	"net/http"
-//
-// 	"github.com/shricodev/gophercast/server"
-// )
-
 /*
 Copyright © 2025 shrijal.acharya@gmail.com
 
@@ -24,8 +17,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
-// import "github.com/shricodev/gophercast/cmd"
 
 func main() {
 	cmd.Execute()
