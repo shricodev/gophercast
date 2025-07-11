@@ -97,7 +97,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "esc":
-			if m.state != screenMenu && m.state != screenAppRunning {
+			switch m.state {
+			case screenPickDir, screenInputYoutube, screenInputPlaylist:
 				m.state = screenMenu
 				return m, nil
 			}
@@ -169,7 +170,10 @@ func InitialModel() model {
 	fp := filepicker.New()
 	fp.DirAllowed = true
 	fp.FileAllowed = false
-	fp.ShowHidden = false
+
+	// fp.ShowHidden is set to true because by default we save the files in the
+	// ~/.gophercast/downloads directory.
+	fp.ShowHidden = true
 
 	homeDir, err := os.UserHomeDir()
 	if err == nil {

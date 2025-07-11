@@ -29,37 +29,6 @@ func DefaultConfig() *DownloadConfig {
 	}
 }
 
-// sanitizeFilename cleans up filenames for safe storage
-func sanitizeFilename(filename string) string {
-	filename = strings.ToLower(filename)
-
-	filename = strings.ReplaceAll(filename, " ", "_")
-
-	reg := regexp.MustCompile(`[^a-zA-Z0-9\-_.]`)
-	filename = reg.ReplaceAllString(filename, "")
-
-	reg = regexp.MustCompile(`_+`)
-	filename = reg.ReplaceAllString(filename, "_")
-
-	filename = strings.Trim(filename, "_")
-
-	return filename
-}
-
-// ensureDir creates directory if it doesn't exist
-func ensureDir(path string) error {
-	return os.MkdirAll(path, 0755)
-}
-
-// checkYtDlp verifies yt-dlp is installed
-func checkYtDlp() error {
-	_, err := exec.LookPath("yt-dlp")
-	if err != nil {
-		return fmt.Errorf("yt-dlp not found: %v\nPlease install with: pip install yt-dlp", err)
-	}
-	return nil
-}
-
 // DownloadVideo downloads a single YouTube video
 func DownloadVideo(url string, config *DownloadConfig) (types.Track, error) {
 	if err := checkYtDlp(); err != nil {
@@ -101,7 +70,7 @@ func DownloadVideo(url string, config *DownloadConfig) (types.Track, error) {
 	return track, nil
 }
 
-func DownloadPlaylist(url string, config *DownloadConfig) (types.Playlist, error) {
+func DownloadPlaylist(url string, config *DownloadConfig) (*types.Playlist, error) {
 	if err := checkYtDlp(); err != nil {
 		return nil, err
 	}
@@ -148,4 +117,35 @@ func DownloadPlaylist(url string, config *DownloadConfig) (types.Playlist, error
 	}
 
 	return playlist.BuildPlaylistFromDir(types.Path(playlistDir))
+}
+
+// sanitizeFilename cleans up filenames for safe storage
+func sanitizeFilename(filename string) string {
+	filename = strings.ToLower(filename)
+
+	filename = strings.ReplaceAll(filename, " ", "_")
+
+	reg := regexp.MustCompile(`[^a-zA-Z0-9\-_.]`)
+	filename = reg.ReplaceAllString(filename, "")
+
+	reg = regexp.MustCompile(`_+`)
+	filename = reg.ReplaceAllString(filename, "_")
+
+	filename = strings.Trim(filename, "_")
+
+	return filename
+}
+
+// ensureDir creates directory if it doesn't exist
+func ensureDir(path string) error {
+	return os.MkdirAll(path, 0755)
+}
+
+// checkYtDlp verifies yt-dlp is installed
+func checkYtDlp() error {
+	_, err := exec.LookPath("yt-dlp")
+	if err != nil {
+		return fmt.Errorf("yt-dlp not found: %v\nPlease install with: pip install yt-dlp", err)
+	}
+	return nil
 }

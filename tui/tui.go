@@ -59,12 +59,12 @@ func downloadYouTubePlaylist(url string, config *downloader.DownloadConfig) tea.
 		}
 
 		var dirPath types.Path
-		if len(tracks) > 0 {
-			dirPath = tracks[0].Path
+		if tracks.Len() > 0 {
+			dirPath = (*tracks)[0].Path
 		}
 
 		return downloadCompleteMsg{
-			tracks: tracks,
+			tracks: *tracks,
 			path:   dirPath,
 		}
 	}

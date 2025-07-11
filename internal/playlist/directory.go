@@ -9,11 +9,11 @@ import (
 	"github.com/shricodev/gophercast/pkg/types"
 )
 
-func BuildPlaylistFromDir(root types.Path) (types.Playlist, error) {
+func BuildPlaylistFromDir(root types.Path) (*types.Playlist, error) {
 	return buildPlaylistFromFS(os.DirFS(root.String()), root)
 }
 
-func buildPlaylistFromFS(fsys fs.FS, root types.Path) (types.Playlist, error) {
+func buildPlaylistFromFS(fsys fs.FS, root types.Path) (*types.Playlist, error) {
 	var tracks types.Playlist
 
 	err := fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
@@ -42,5 +42,5 @@ func buildPlaylistFromFS(fsys fs.FS, root types.Path) (types.Playlist, error) {
 		return nil, err
 	}
 
-	return tracks, nil
+	return &tracks, nil
 }

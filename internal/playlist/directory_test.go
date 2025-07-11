@@ -80,9 +80,9 @@ func TestBuildPlaylistFromFS(t *testing.T) {
 			}
 
 			testutil.AssertNoErr(t, err)
-			testutil.AssertLen(t, len(playlist), tt.expectedTracksLen)
+			testutil.AssertLen(t, playlist.Len(), tt.expectedTracksLen)
 
-			for _, track := range playlist {
+			for _, track := range *playlist {
 				testutil.AssertNotEmpty(t, track.Title)
 				testutil.AssertEqual(t, string(track.Source), string(types.SourceLocalDir))
 				testutil.AssertContains(t, track.Title, ".mp3")
