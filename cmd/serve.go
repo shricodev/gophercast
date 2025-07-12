@@ -51,12 +51,18 @@ func init() {
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	serveCmd.Flags().StringVarP(&dirToMP3, sourceLocalDirStr, "d", "", "Path to the audio(mp3) directory")
+	serveCmd.Flags().
+		StringVarP(&dirToMP3, sourceLocalDirStr, "d", "", "Path to the audio(mp3) directory")
 	serveCmd.Flags().StringVarP(&ytURL, sourceYoutubeStr, "y", "", "Link to the youtube video")
-	serveCmd.Flags().StringVarP(&ytPlaylist, sourceYoutubePlaylistStr, "p", "", "Link to the youtube playlist")
+	serveCmd.Flags().
+		StringVarP(&ytPlaylist, sourceYoutubePlaylistStr, "p", "", "Link to the youtube playlist")
 
 	// serveCmd.MarkFlagsOneRequired(sourceLocalDirStr, sourceYoutubeStr, sourceYoutubePlaylistStr)
-	serveCmd.MarkFlagsMutuallyExclusive(sourceLocalDirStr, sourceYoutubeStr, sourceYoutubePlaylistStr)
+	serveCmd.MarkFlagsMutuallyExclusive(
+		sourceLocalDirStr,
+		sourceYoutubeStr,
+		sourceYoutubePlaylistStr,
+	)
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:

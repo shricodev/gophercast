@@ -14,6 +14,7 @@ import (
 	"github.com/shricodev/gophercast/pkg/types"
 )
 
+// DownloadConfig holds the configuration for downloading videos.
 type DownloadConfig struct {
 	OutputDir types.Path
 	Quality   string
@@ -21,6 +22,7 @@ type DownloadConfig struct {
 	Workers   int
 }
 
+// DefaultConfig returns a default download configuration.
 func DefaultConfig() *DownloadConfig {
 	homeDir, _ := os.UserHomeDir()
 	return &DownloadConfig{
@@ -31,17 +33,20 @@ func DefaultConfig() *DownloadConfig {
 	}
 }
 
+// PlaylistVideo represents a single video in a YouTube playlist.
 type PlaylistVideo struct {
 	URL   string `json:"url"`
 	Title string `json:"title"`
 	ID    string `json:"id"`
 }
 
+// PlaylistInfo represents information about a YouTube playlist.
 type PlaylistInfo struct {
 	Title   string          `json:"title"`
 	Entries []PlaylistVideo `json:"entries"`
 }
 
+// DownloadProgress represents the progress of a download operation.
 type DownloadProgress struct {
 	Completed int
 	Total     int
@@ -49,9 +54,10 @@ type DownloadProgress struct {
 	Failed    []string
 }
 
+// ProgressCallback is a function type for reporting download progress.
 type ProgressCallback func(progress DownloadProgress)
 
-// DownloadVideo downloads a single YouTube video
+// DownloadVideo downloads a single YouTube video.
 func DownloadVideo(url string, config *DownloadConfig) (types.Track, error) {
 	if err := checkYtDlp(); err != nil {
 		return types.Track{}, err
@@ -92,6 +98,7 @@ func DownloadVideo(url string, config *DownloadConfig) (types.Track, error) {
 	return track, nil
 }
 
+// DownloadPlaylist downloads an entire YouTube playlist.
 func DownloadPlaylist(url string, config *DownloadConfig) (*types.Playlist, error) {
 	if err := checkYtDlp(); err != nil {
 		return nil, err
@@ -121,7 +128,12 @@ func DownloadPlaylist(url string, config *DownloadConfig) (*types.Playlist, erro
 	return tracks, nil
 }
 
-func DownloadPlaylistWithProgress(url string, config *DownloadConfig, progressCallback ProgressCallback) (*types.Playlist, error) {
+// DownloadPlaylistWithProgress downloads an entire YouTube playlist and reports progress.
+func DownloadPlaylistWithProgress(
+	url string,
+	config *DownloadConfig,
+	progressCallback ProgressCallback,
+) (*types.Playlist, error) {
 	if err := checkYtDlp(); err != nil {
 		return nil, err
 	}
@@ -142,7 +154,12 @@ func DownloadPlaylistWithProgress(url string, config *DownloadConfig, progressCa
 		return nil, fmt.Errorf("failed to create playlist directory: %w", err)
 	}
 
-	tracks, err := downloadVideosConcurrentlyWithProgress(playlistInfo.Entries, playlistDir, config, progressCallback)
+	tracks, err := downloadVideosConcurrentlyWithProgress(
+		playlistInfo.Entries,
+		playlistDir,
+		config,
+		progressCallback,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download playlist: %w", err)
 	}
@@ -150,7 +167,12 @@ func DownloadPlaylistWithProgress(url string, config *DownloadConfig, progressCa
 	return tracks, nil
 }
 
-func downloadVideosConcurrently(videos []PlaylistVideo, outputDir types.Path, config *DownloadConfig) (*types.Playlist, error) {
+// downloadVideosConcurrently downloads multiple videos in parallel.
+func downloadVideosConcurrently(
+	videos []PlaylistVideo,
+	outputDir types.Path,
+	config *DownloadConfig,
+) (*types.Playlist, error) {
 	jobs := make(chan PlaylistVideo, len(videos))
 	results := make(chan downloadResult, len(videos))
 
@@ -175,7 +197,10 @@ func downloadVideosConcurrently(videos []PlaylistVideo, outputDir types.Path, co
 
 	for result := range results {
 		if result.err != nil {
-			errors = append(errors, fmt.Sprintf("failed to download %s: %v", result.video.Title, result.err))
+			errors = append(
+				errors,
+				fmt.Sprintf("failed to download %s: %v", result.video.Title, result.err),
+			)
 		} else {
 			tracks = append(tracks, result.track)
 		}
@@ -188,7 +213,13 @@ func downloadVideosConcurrently(videos []PlaylistVideo, outputDir types.Path, co
 	return &tracks, nil
 }
 
-func downloadVideosConcurrentlyWithProgress(videos []PlaylistVideo, outputDir types.Path, config *DownloadConfig, progressCallback ProgressCallback) (*types.Playlist, error) {
+// downloadVideosConcurrentlyWithProgress downloads multiple videos in parallel and reports progress.
+func downloadVideosConcurrentlyWithProgress(
+	videos []PlaylistVideo,
+	outputDir types.Path,
+	config *DownloadConfig,
+	progressCallback ProgressCallback,
+) (*types.Playlist, error) {
 	jobs := make(chan PlaylistVideo, len(videos))
 	results := make(chan downloadResult, len(videos))
 
@@ -218,7 +249,10 @@ func downloadVideosConcurrentlyWithProgress(videos []PlaylistVideo, outputDir ty
 
 	for result := range results {
 		if result.err != nil {
-			errors = append(errors, fmt.Sprintf("failed to download %s: %v", result.video.Title, result.err))
+			errors = append(
+				errors,
+				fmt.Sprintf("failed to download %s: %v", result.video.Title, result.err),
+			)
 			progress.Failed = append(progress.Failed, result.video.Title)
 		} else {
 			tracks = append(tracks, result.track)
@@ -236,7 +270,12 @@ func downloadVideosConcurrentlyWithProgress(videos []PlaylistVideo, outputDir ty
 	return &tracks, nil
 }
 
-func downloadSingleVideo(video PlaylistVideo, outputDir types.Path, config *DownloadConfig) (types.Track, error) {
+// downloadSingleVideo downloads a single video from a playlist.
+func downloadSingleVideo(
+	video PlaylistVideo,
+	outputDir types.Path,
+	config *DownloadConfig,
+) (types.Track, error) {
 	videoURL := fmt.Sprintf("https://youtube.com/watch?v=%s", video.ID)
 
 	sanitizedTitle := sanitizeFilename(video.Title)
@@ -262,6 +301,7 @@ func downloadSingleVideo(video PlaylistVideo, outputDir types.Path, config *Down
 	return track, nil
 }
 
+// getPlaylistInfo fetches information about a YouTube playlist.
 func getPlaylistInfo(url string) (*PlaylistInfo, error) {
 	cmd := exec.Command("yt-dlp",
 		"--flat-playlist",
@@ -287,13 +327,21 @@ func getPlaylistInfo(url string) (*PlaylistInfo, error) {
 	return &info, nil
 }
 
+// downloadResult represents the result of a single video download.
 type downloadResult struct {
 	track types.Track
 	video PlaylistVideo
 	err   error
 }
 
-func worker(wg *sync.WaitGroup, jobs <-chan PlaylistVideo, results chan<- downloadResult, outputDir types.Path, config *DownloadConfig) {
+// worker is a concurrent worker for downloading videos.
+func worker(
+	wg *sync.WaitGroup,
+	jobs <-chan PlaylistVideo,
+	results chan<- downloadResult,
+	outputDir types.Path,
+	config *DownloadConfig,
+) {
 	defer wg.Done()
 
 	for video := range jobs {
@@ -306,7 +354,15 @@ func worker(wg *sync.WaitGroup, jobs <-chan PlaylistVideo, results chan<- downlo
 	}
 }
 
-func workerWithProgress(wg *sync.WaitGroup, jobs <-chan PlaylistVideo, results chan<- downloadResult, outputDir types.Path, config *DownloadConfig, progressCallback ProgressCallback) {
+// workerWithProgress is a concurrent worker for downloading videos that reports progress.
+func workerWithProgress(
+	wg *sync.WaitGroup,
+	jobs <-chan PlaylistVideo,
+	results chan<- downloadResult,
+	outputDir types.Path,
+	config *DownloadConfig,
+	progressCallback ProgressCallback,
+) {
 	defer wg.Done()
 
 	for video := range jobs {
@@ -326,7 +382,7 @@ func workerWithProgress(wg *sync.WaitGroup, jobs <-chan PlaylistVideo, results c
 	}
 }
 
-// sanitizeFilename cleans up filenames for safe storage
+// sanitizeFilename cleans up filenames for safe storage.
 func sanitizeFilename(filename string) string {
 	filename = strings.ToLower(filename)
 
@@ -343,12 +399,12 @@ func sanitizeFilename(filename string) string {
 	return filename
 }
 
-// ensureDir creates directory if it doesn't exist
+// ensureDir creates directory if it doesn't exist.
 func ensureDir(path types.Path) error {
 	return os.MkdirAll(path.String(), 0755)
 }
 
-// checkYtDlp verifies yt-dlp is installed
+// checkYtDlp verifies yt-dlp is installed.
 func checkYtDlp() error {
 	_, err := exec.LookPath("yt-dlp")
 	if err != nil {

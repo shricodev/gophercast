@@ -83,7 +83,11 @@ func New(config Config) (*Logger, error) {
 func createFileWriter(basePath types.Path) (io.Writer, error) {
 	now := time.Now()
 
-	dirPath := filepath.Join(basePath.String(), fmt.Sprintf("%d", now.Year()), fmt.Sprintf("%02d", now.Month()))
+	dirPath := filepath.Join(
+		basePath.String(),
+		fmt.Sprintf("%d", now.Year()),
+		fmt.Sprintf("%02d", now.Month()),
+	)
 	if err := os.MkdirAll(dirPath, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create log directory: %w", err)
 	}
