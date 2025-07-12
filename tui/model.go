@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/filepicker"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -25,8 +26,12 @@ type model struct {
 	dirPath            types.Path
 	youtubeURL         string
 	youtubePlaylistURL string
-	downloadedTracks   types.Playlist
-	downloadConfig     *downloader.DownloadConfig
+
+	downloadedTracks types.Playlist
+	downloadConfig   *downloader.DownloadConfig
+
+	downloadProgress     progress.Model
+	showDownloadProgress bool
 
 	err error
 }
