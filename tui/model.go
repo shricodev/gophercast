@@ -2,6 +2,7 @@ package tui
 
 import (
 	"os"
+	"time"
 
 	"github.com/charmbracelet/bubbles/filepicker"
 	"github.com/charmbracelet/bubbles/list"
@@ -12,26 +13,33 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/shricodev/gophercast/internal/downloader"
+	"github.com/shricodev/gophercast/internal/logger"
 	"github.com/shricodev/gophercast/pkg/types"
 )
 
 type model struct {
-	state   screen
-	list    list.Model
-	spinner spinner.Model
+	state screen
 
+	list       list.Model
+	spinner    spinner.Model
+	progress   progress.Model
 	filePicker filepicker.Model
 	textInput  textinput.Model
 
-	dirPath            types.Path
+	dirToMp3           types.Path
 	youtubeURL         string
 	youtubePlaylistURL string
 
 	downloadedTracks types.Playlist
+	downloader       *downloader.Downloader
 	downloadConfig   *downloader.DownloadConfig
+	downloadProgress *downloader.DownloadProgress
 
-	downloadProgress     progress.Model
+	isShuttingDown       bool
+	shutdownMessage      string
 	showDownloadProgress bool
+
+	logger *logger.Logger
 
 	err error
 }
@@ -46,10 +54,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		key := msg.String()
 
 		switch key {
-		case "ctrl+c":
+		case tea.KeyCtrlC.String():
+			if m.state == screenAppStarting && m.downloader != nil {
+				if !m.isShuttingDown {
+					m.isShuttingDown = true
+					m.shutdownMessage = "Gracefully shutting down... Please wait for the download to finish."
+					return m, tea.Batch(
+						initializeShutdown(m.downloader),
+						tea.Tick(time.Millisecond*100, func(t time.Time) tea.Msg {
+							return shutdownMsg{}
+						}),
+					)
+				}
+
+				return m, nil
+			}
+
 			return m, tea.Quit
 
-		case "enter":
+		case tea.KeyEnter.String():
 			switch m.state {
 			case screenMenu:
 				selectedItem := m.list.SelectedItem().(item)
@@ -72,7 +95,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				selectedPath := m.filePicker.Path
 				if selectedPath != "" {
 					if info, err := os.Stat(selectedPath); err == nil && info.IsDir() {
-						m.dirPath = types.Path(selectedPath)
+						m.dirToMp3 = types.Path(selectedPath)
 						m.state = screenAppStarting
 						return m, tea.Batch(m.spinner.Tick, run)
 					}
@@ -81,13 +104,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.textInput.Value() != "" {
 					m.youtubeURL = m.textInput.Value()
 					m.state = screenAppStarting
-					return m, tea.Batch(m.spinner.Tick, downloadYouTubeVideo(m.youtubeURL, m.downloadConfig))
+
+					config := downloader.DefaultConfig()
+					downloader := downloader.NewDownloader(config)
+
+					return m, tea.Batch(m.spinner.Tick, downloadYouTubeVideo(m.youtubeURL, downloader))
 				}
 			case screenInputPlaylist:
 				if m.textInput.Value() != "" {
 					m.youtubePlaylistURL = m.textInput.Value()
 					m.state = screenAppStarting
-					return m, tea.Batch(m.spinner.Tick, downloadYouTubePlaylist(m.youtubePlaylistURL, m.downloadConfig))
+					m.showDownloadProgress = true
+
+					config := downloader.DefaultConfig()
+					downloader := downloader.NewDownloader(config)
+
+					return m, tea.Batch(m.spinner.Tick, downloadYouTubePlaylist(m.youtubePlaylistURL, downloader))
 				}
 			}
 
@@ -95,13 +127,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.state == screenPickDir {
 				currentDir := m.filePicker.CurrentDirectory
 				if currentDir != "" {
-					m.dirPath = types.Path(currentDir)
+					m.dirToMp3 = types.Path(currentDir)
 					m.state = screenAppStarting
 					return m, tea.Batch(m.spinner.Tick, run)
 				}
 			}
 
-		case "esc":
+		case tea.KeyEsc.String():
 			switch m.state {
 			case screenPickDir, screenInputYoutube, screenInputPlaylist:
 				m.state = screenMenu
@@ -122,20 +154,44 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// of the picker grows super huge (might be an issue with bubble
 		// itself, or I'm not correct).
 		m.filePicker.SetHeight(msg.Height - 40)
-		// m.filePicker.SetHeight(10)
+
+		m.progress.Width = msg.Width - hor - 40
+
+	case downloadProgressMsg:
+		m.downloadProgress = msg.progress
+		if m.downloadProgress.Total > 0 {
+			percentage := float64(m.downloadProgress.Completed) / float64(m.downloadProgress.Total)
+			return m, m.progress.SetPercent(percentage)
+		}
+
+	case downloadCompleteMsg:
+		m.downloadedTracks = msg.tracks
+		m.dirToMp3 = msg.path
+		m.state = screenAppRunning
+		m.showDownloadProgress = false
+
+		if m.downloader != nil {
+			m.downloader.Shutdown()
+			m.downloader = nil
+		}
+		return m, nil
 
 	case appStartedMsg:
 		m.state = screenAppRunning
 		return m, nil
 
-	case downloadCompleteMsg:
-		m.downloadedTracks = msg.tracks
-		m.dirPath = msg.path
-		m.state = screenAppRunning
+	case shutdownInitiatedMsg:
 		return m, nil
+
+	case shutdownCompleteMsg:
+		return m, tea.Quit
 
 	case errMsg:
 		m.err = msg
+		if m.downloader != nil {
+			m.downloader.Shutdown()
+			m.downloader = nil
+		}
 		return m, tea.Quit
 	}
 
@@ -190,16 +246,44 @@ func InitialModel() model {
 	ti.Width = 50
 
 	s := spinner.New()
-	s.Spinner = spinner.Monkey
+	s.Spinner = spinner.Globe
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
+	p := progress.New(progress.WithDefaultScaledGradient())
+
+	downloadConfig := downloader.DefaultConfig()
+	d := downloader.NewDownloader(downloadConfig)
+
+	logger, err := logger.New(logger.Config{
+		Level:      logger.LevelInfo,
+		Output:     "stdout",
+		TimeFormat: "15:04:05",
+	})
+	if err != nil {
+		panic("failed to initialize logger: " + err.Error())
+	}
+
 	return model{
-		list:           l,
-		state:          screenMenu,
-		filePicker:     fp,
-		textInput:      ti,
-		spinner:        s,
-		downloadConfig: downloader.DefaultConfig(),
+		state: screenMenu,
+
+		list:       l,
+		spinner:    s,
+		progress:   p,
+		filePicker: fp,
+		textInput:  ti,
+
+		downloadConfig:   downloadConfig,
+		downloader:       d,
+		downloadProgress: &downloader.DownloadProgress{},
+
+		logger: logger,
+	}
+}
+
+func initializeShutdown(d *downloader.Downloader) tea.Cmd {
+	return func() tea.Msg {
+		d.Shutdown()
+		return shutdownInitiatedMsg{}
 	}
 }
 
@@ -218,3 +302,24 @@ func (i item) Description() string { return i.desc }
 
 // FilterValue satisfies the list.Item interface
 func (i item) FilterValue() string { return i.title }
+
+type (
+	appStartedMsg        struct{}
+	shutdownInitiatedMsg struct{}
+	shutdownMsg          struct{}
+	shutdownCompleteMsg  struct{}
+	downloadProgressMsg  struct {
+		progress *downloader.DownloadProgress
+	}
+	downloadCompleteMsg struct {
+		tracks types.Playlist
+		path   types.Path
+	}
+)
+
+type errMsg struct{ err error }
+
+// Implements the error interface.
+func (e errMsg) Error() string {
+	return e.err.Error()
+}

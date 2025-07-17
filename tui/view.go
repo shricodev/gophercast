@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -32,6 +33,7 @@ func (m model) View() string {
 	switch m.state {
 	case screenMenu:
 		body = m.list.View()
+
 	case screenPickDir:
 		body = lipgloss.JoinVertical(lipgloss.Left,
 			"Choose a directory:",
@@ -39,6 +41,7 @@ func (m model) View() string {
 			m.filePicker.View(),
 			helpStyle.Render("↑/↓ j/k: Navigate, Enter: Select, d: Select cwd, Esc: Back"),
 		)
+
 	case screenInputYoutube:
 		body = lipgloss.JoinVertical(lipgloss.Left,
 			"Enter YouTube URL:",
@@ -47,6 +50,7 @@ func (m model) View() string {
 			"",
 			helpStyle.Render("Enter: Confirm, Esc: Back"),
 		)
+
 	case screenInputPlaylist:
 		body = lipgloss.JoinVertical(lipgloss.Left,
 			"Enter YouTube Playlist URL:",
@@ -55,20 +59,106 @@ func (m model) View() string {
 			"",
 			helpStyle.Render("Enter: Confirm, Esc: Back"),
 		)
+
 	case screenAppStarting:
-		message := "Starting work, please wait..."
-		if m.youtubeURL != "" {
-			message = "Downloading YouTube video, please wait..."
-		} else if m.youtubePlaylistURL != "" {
-			message = "Downloading YouTube playlist, please wait..."
+		var message string
+		var components []string
+
+		if m.isShuttingDown {
+			shutdownStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("208"))
+
+			components = append(components, shutdownStyle.Render(m.shutdownMessage))
+
+			if m.showDownloadProgress && m.downloadProgress.Total > 0 {
+				components = append(components, "")
+				components = append(
+					components,
+					fmt.Sprintf(
+						"Completing downloads: %d/%d",
+						m.downloadProgress.Completed,
+						m.downloadProgress.Total,
+					),
+				)
+
+				if m.downloadProgress.Current != "" {
+					components = append(
+						components,
+						fmt.Sprintf("Current: %s", m.downloadProgress.Current),
+					)
+				}
+
+				if len(m.downloadProgress.Failed) > 0 {
+					components = append(
+						components,
+						fmt.Sprintf("Failed: %d", len(m.downloadProgress.Failed)),
+					)
+				}
+
+				components = append(components, "")
+				components = append(components, m.progress.View())
+			}
+			components = append(components, "")
+			components = append(
+				components,
+				helpStyle.Render("Please wait... Downloads will complete gracefully."),
+			)
+		} else {
+			message = "Starting work, please wait..."
+			if m.youtubeURL != "" {
+				message = "Downloading YouTube video, please wait..."
+			} else if m.youtubePlaylistURL != "" {
+				message = "Downloading YouTube playlist, please wait..."
+			}
+
+			components = append(components, m.spinner.View()+" "+message)
+
+			if m.showDownloadProgress && m.downloadProgress.Total > 0 {
+				components = append(components, "")
+				components = append(components, fmt.Sprintf("Progress: %d/%d completed",
+					m.downloadProgress.Completed, m.downloadProgress.Total))
+
+				if m.downloadProgress.Current != "" {
+					components = append(components, fmt.Sprintf("Downloading: %s", m.downloadProgress.Current))
+				}
+
+				if len(m.downloadProgress.Failed) > 0 {
+					components = append(components, fmt.Sprintf("Failed: %d", len(m.downloadProgress.Failed)))
+				}
+
+				components = append(components, "")
+				components = append(components, m.progress.View())
+			}
+
+			components = append(components, "")
+			components = append(
+				components,
+				helpStyle.Render("Press Ctrl + C for graceful shutdown"),
+			)
 		}
-		body = m.spinner.View() + " " + message
+
+		body = lipgloss.JoinVertical(lipgloss.Left, components...)
+
 	case screenAppRunning:
-		body = lipgloss.JoinVertical(lipgloss.Left,
-			"Server running!",
-			"",
-			helpStyle.Render("Press Ctrl + C to exit"),
-		)
+		var components []string
+
+		components = append(components, "Server running!")
+
+		if m.downloadedTracks.Len() > 0 {
+			components = append(components, "")
+			components = append(
+				components,
+				fmt.Sprintf("Downloaded %d tracks successfully!", m.downloadedTracks.Len()),
+			)
+
+			if m.dirPath != "" {
+				components = append(components, fmt.Sprintf("Location: %s", m.dirPath))
+			}
+		}
+
+		components = append(components, "")
+		components = append(components, helpStyle.Render("Press Ctrl + C to exit"))
+
+		body = lipgloss.JoinVertical(lipgloss.Left, components...)
 	}
 
 	full := lipgloss.JoinVertical(lipgloss.Left, header, "", body, "", "")

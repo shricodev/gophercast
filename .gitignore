@@ -17,6 +17,8 @@ coverage.*
 *.coverprofile
 profile.cov
 
+prompt.md
+
 # Ignore the compiled binaries
 bin/**
 
