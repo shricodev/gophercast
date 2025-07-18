@@ -2,7 +2,6 @@ package tui
 
 import (
 	"os"
-	"time"
 
 	"github.com/charmbracelet/bubbles/filepicker"
 	"github.com/charmbracelet/bubbles/list"
@@ -59,12 +58,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if !m.isShuttingDown {
 					m.isShuttingDown = true
 					m.shutdownMessage = "Gracefully shutting down... Please wait for the download to finish."
-					return m, tea.Batch(
-						initializeShutdown(m.downloader),
-						tea.Tick(time.Millisecond*100, func(t time.Time) tea.Msg {
-							return shutdownMsg{}
-						}),
-					)
+					return m, shutdown(m.downloader)
 				}
 
 				return m, nil
@@ -180,9 +174,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = screenAppRunning
 		return m, nil
 
-	case shutdownInitiatedMsg:
-		return m, nil
-
 	case shutdownCompleteMsg:
 		return m, tea.Quit
 
@@ -280,10 +271,10 @@ func InitialModel() model {
 	}
 }
 
-func initializeShutdown(d *downloader.Downloader) tea.Cmd {
+func shutdown(d *downloader.Downloader) tea.Cmd {
 	return func() tea.Msg {
 		d.Shutdown()
-		return shutdownInitiatedMsg{}
+		return shutdownCompleteMsg{}
 	}
 }
 
@@ -304,11 +295,9 @@ func (i item) Description() string { return i.desc }
 func (i item) FilterValue() string { return i.title }
 
 type (
-	appStartedMsg        struct{}
-	shutdownInitiatedMsg struct{}
-	shutdownMsg          struct{}
-	shutdownCompleteMsg  struct{}
-	downloadProgressMsg  struct {
+	appStartedMsg       struct{}
+	shutdownCompleteMsg struct{}
+	downloadProgressMsg struct {
 		progress *downloader.DownloadProgress
 	}
 	downloadCompleteMsg struct {

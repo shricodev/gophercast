@@ -209,10 +209,11 @@ func (d *Downloader) downloadVideosConcurrently(
 ) (*types.Playlist, error) {
 	jobsCh := make(chan PlaylistVideo, len(videos))
 	resultsCh := make(chan downloadResult, len(videos))
+	startedCh := make(chan bool, len(videos))
 
 	for range d.config.Workers {
 		d.wg.Add(1)
-		go d.worker(jobsCh, resultsCh, outputDir)
+		go d.worker(jobsCh, resultsCh, outputDir, startedCh)
 	}
 
 	go func() {
@@ -229,10 +230,13 @@ func (d *Downloader) downloadVideosConcurrently(
 	var tracks types.Playlist
 	var errors []string
 	completed := 0
+	started := 0
 
 	for completed < len(videos) {
 		select {
 		case <-d.ctx.Done():
+			// Only wait for downloads that have actually started
+			expectedResults := started
 			d.wg.Wait()
 			close(resultsCh)
 
@@ -241,13 +245,19 @@ func (d *Downloader) downloadVideosConcurrently(
 				if result.err == nil {
 					tracks = append(tracks, result.track)
 				}
+				if completed >= expectedResults {
+					break
+				}
 			}
 
 			return &tracks, fmt.Errorf(
-				"download interruped: %d/%d completed",
+				"download interrupted: %d/%d completed",
 				len(tracks),
 				len(videos),
 			)
+
+		case <-startedCh:
+			started++
 
 		case result := <-resultsCh:
 			completed++
@@ -357,6 +367,7 @@ func (d *Downloader) worker(
 	jobs <-chan PlaylistVideo,
 	results chan<- downloadResult,
 	outputDir types.Path,
+	started chan<- bool,
 ) {
 	defer d.wg.Done()
 
@@ -364,6 +375,13 @@ func (d *Downloader) worker(
 		select {
 		case video, ok := <-jobs:
 			if !ok {
+				return
+			}
+
+			// Signal that we've started this download
+			select {
+			case started <- true:
+			case <-d.ctx.Done():
 				return
 			}
 

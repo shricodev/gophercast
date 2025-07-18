@@ -150,8 +150,8 @@ func (m model) View() string {
 				fmt.Sprintf("Downloaded %d tracks successfully!", m.downloadedTracks.Len()),
 			)
 
-			if m.dirPath != "" {
-				components = append(components, fmt.Sprintf("Location: %s", m.dirPath))
+			if m.dirToMp3 != "" {
+				components = append(components, fmt.Sprintf("Location: %s", m.dirToMp3))
 			}
 		}
 
