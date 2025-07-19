@@ -1,5 +1,3 @@
-// Package tui provides the terminal user interface for Gophercast.
-// It is responsible for rendering the UI and handling user input.
 package tui
 
 import (
@@ -13,6 +11,23 @@ import (
 
 	"github.com/shricodev/gophercast/internal/downloader"
 	"github.com/shricodev/gophercast/pkg/types"
+)
+
+const (
+	directory       = "Directory"
+	youtube         = "YouTube"
+	youtubePlaylist = "Playlist"
+)
+
+type screen int
+
+const (
+	screenMenu screen = iota
+	screenPickDir
+	screenInputYoutube
+	screenInputPlaylist
+	screenAppStarting
+	screenAppRunning
 )
 
 var (
