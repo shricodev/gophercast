@@ -1,3 +1,4 @@
+// Package playlist provides functionality for managing playlists.
 package playlist
 
 import (
@@ -9,6 +10,7 @@ import (
 	"github.com/shricodev/gophercast/pkg/types"
 )
 
+// TestBuildPlaylistFromFS tests the BuildPlaylistFromFS function.
 func TestBuildPlaylistFromFS(t *testing.T) {
 	tests := []struct {
 		name              string

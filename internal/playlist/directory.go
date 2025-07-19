@@ -1,4 +1,4 @@
-// Package playlist is the playlist builder
+// Package playlist provides functionality for managing playlists.
 package playlist
 
 import (
@@ -9,10 +9,12 @@ import (
 	"github.com/shricodev/gophercast/pkg/types"
 )
 
+// BuildPlaylistFromDir builds a playlist from a given directory.
 func BuildPlaylistFromDir(root types.Path) (*types.Playlist, error) {
 	return buildPlaylistFromFS(os.DirFS(root.String()), root)
 }
 
+// buildPlaylistFromFS builds a playlist from a given file system.
 func buildPlaylistFromFS(fsys fs.FS, root types.Path) (*types.Playlist, error) {
 	var tracks types.Playlist
 

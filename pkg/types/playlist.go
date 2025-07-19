@@ -1,5 +1,7 @@
+// Package types provides the data structures for Gophercast.
 package types
 
+// Playlist is a collection of tracks.
 type Playlist []Track
 
 func (p *Playlist) Len() int {

@@ -1,4 +1,5 @@
-// Package tui launches the tui with BubbleTea
+// Package tui provides the terminal user interface for Gophercast.
+// It is responsible for rendering the UI and handling user input.
 package tui
 
 import (
@@ -22,12 +23,14 @@ var (
 	helpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Padding(1, 0)
 )
 
+// run is a placeholder for the actual work that needs to be done.
 func run() tea.Msg {
 	// perform the actual work
 	time.Sleep(2 * time.Second)
 	return appStartedMsg{}
 }
 
+// downloadYouTubeVideo downloads a YouTube video and returns a message.
 func downloadYouTubeVideo(url string, d *downloader.Downloader) tea.Cmd {
 	return func() tea.Msg {
 		progressChan := make(chan downloader.DownloadProgress, 1)
@@ -69,6 +72,7 @@ func downloadYouTubeVideo(url string, d *downloader.Downloader) tea.Cmd {
 	}
 }
 
+// downloadYouTubePlaylist downloads a YouTube playlist and returns a message.
 func downloadYouTubePlaylist(url string, d *downloader.Downloader) tea.Cmd {
 	return func() tea.Msg {
 		progressChan := make(chan downloader.DownloadProgress, 1)
@@ -120,6 +124,7 @@ func downloadYouTubePlaylist(url string, d *downloader.Downloader) tea.Cmd {
 	}
 }
 
+// Start starts the Bubble Tea TUI.
 func Start() (types.Path, string, string) {
 	m := InitialModel()
 	p := tea.NewProgram(m)

@@ -1,3 +1,4 @@
+// Package cmd provides command-line commands for Gophercast.
 package cmd
 
 /*
@@ -19,7 +20,7 @@ var (
 	ytPlaylist string
 )
 
-// serveCmd represents the serve command
+// serveCmd represents the serve command.
 var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Serve subcommand serves the audio either with a local file, a directory of audio files or a yt URL",

@@ -1,3 +1,4 @@
+// Package cmd provides command-line commands for Gophercast.
 package cmd
 
 /*
@@ -11,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// playCmd represents the play command
+// playCmd represents the play command.
 var playCmd = &cobra.Command{
 	Use:   "play",
 	Short: "A brief description of your command",

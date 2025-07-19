@@ -1,3 +1,5 @@
+// Package tui provides the terminal user interface for Gophercast.
+// It is responsible for rendering the UI and handling user input.
 package tui
 
 import (
@@ -16,6 +18,7 @@ import (
 	"github.com/shricodev/gophercast/pkg/types"
 )
 
+// model represents the state of the TUI.
 type model struct {
 	state screen
 
@@ -43,10 +46,12 @@ type model struct {
 	err error
 }
 
+// Init initializes the TUI model.
 func (m model) Init() tea.Cmd {
 	return nil
 }
 
+// Update handles messages and updates the model accordingly.
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -208,7 +213,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// InitialModel returns the initial model for the application.
+// InitialModel returns the initial model for the TUI.
 func InitialModel() model {
 	items := []list.Item{
 		item{title: directory, desc: "Pick a directory with mp3 files"},
@@ -271,6 +276,7 @@ func InitialModel() model {
 	}
 }
 
+// shutdown gracefully shuts down the downloader.
 func shutdown(d *downloader.Downloader) tea.Cmd {
 	return func() tea.Msg {
 		d.Shutdown()
@@ -306,6 +312,7 @@ type (
 	}
 )
 
+// errMsg represents an error message.
 type errMsg struct{ err error }
 
 // Implements the error interface.

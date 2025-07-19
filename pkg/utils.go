@@ -1,2 +1,2 @@
-// Package pkg is a collection of helper functions
+// Package pkg provides utility functions and types for Gophercast.
 package pkg

@@ -1,3 +1,4 @@
+// Package types provides the data structures for Gophercast.
 package types
 
 import (
@@ -5,6 +6,7 @@ import (
 	"time"
 )
 
+// Track represents a single audio track.
 type Track struct {
 	Title     string
 	Path      Path

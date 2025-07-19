@@ -1,3 +1,5 @@
+// Package tui provides the terminal user interface for Gophercast.
+// It is responsible for rendering the UI and handling user input.
 package tui
 
 import (
@@ -9,6 +11,7 @@ import (
 	"github.com/fatih/color"
 )
 
+// View renders the TUI.
 func (m model) View() string {
 	if m.err != nil {
 		return docStyle.Render("Error: " + m.err.Error())

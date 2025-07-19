@@ -1,4 +1,4 @@
-// Package types is a collection of custom types
+// Package types provides the data structures for Gophercast.
 package types
 
 import (
@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 )
 
+// Path represents a file path.
 type Path string
 
 func NewPath(s string) (Path, error) {

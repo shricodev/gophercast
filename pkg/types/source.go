@@ -1,5 +1,7 @@
+// Package types provides the data structures for Gophercast.
 package types
 
+// Source represents the source of a track.
 type Source string
 
 const (

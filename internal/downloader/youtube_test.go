@@ -1,2 +1,2 @@
-// Package downloader handles YouTube downloads: videos and playlists
+// Package downloader provides functionality for downloading YouTube videos and playlists.
 package downloader

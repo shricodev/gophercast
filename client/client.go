@@ -1,5 +1,5 @@
-// Emulate a client that connects to a WebSocket server and receives audio chunks
-package main
+// Package client provides the client-side functionality for Gophercast.
+package client
 
 import (
 	"fmt"
@@ -10,11 +10,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// AudioClient represents a client that connects to an audio server.
 type AudioClient struct {
 	conn       *websocket.Conn
 	outputFile *os.File
 }
 
+// NewAudioClient creates a new AudioClient instance.
 func NewAudioClient(serverURL, outputFileName string) (*AudioClient, error) {
 	conn, _, err := websocket.DefaultDialer.Dial(serverURL, nil)
 	if err != nil {
@@ -33,6 +35,7 @@ func NewAudioClient(serverURL, outputFileName string) (*AudioClient, error) {
 	}, nil
 }
 
+// Start starts the audio client, listening for audio chunks.
 func (c *AudioClient) Start() {
 	fmt.Println("connected to audio server, listening for audio chunks...")
 	fmt.Printf("writing audio to file: %s\n", c.outputFile.Name())
@@ -54,11 +57,13 @@ func (c *AudioClient) Start() {
 	}
 }
 
+// Close closes the client connection and output file.
 func (c *AudioClient) Close() {
 	defer c.conn.Close()
 	c.outputFile.Close()
 }
 
+// main function to run the audio client.
 func main() {
 	serverURL := "ws://localhost:8080/ws"
 	outputFile := "received_audio.wav"

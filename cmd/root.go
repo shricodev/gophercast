@@ -1,4 +1,4 @@
-// Package cmd is the start of the CLI application
+// Package cmd provides command-line commands for Gophercast.
 package cmd
 
 /*
@@ -27,7 +27,7 @@ import (
 
 var cfgFile string
 
-// rootCmd represents the base command when called without any subcommands
+// rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
 	Use:   "gophercast",
 	Short: "Radio like audio streaming over clients connected in a LAN",
@@ -40,6 +40,8 @@ synchronization play in multiple devices that works as a speaker.
 	// Run: func(cmd *cobra.Command, args []string) { },
 }
 
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {

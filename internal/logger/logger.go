@@ -1,4 +1,4 @@
-// Package logger handles logging with slog
+// Package logger provides a logging utility for Gophercast.
 package logger
 
 import (
@@ -14,6 +14,7 @@ import (
 	"github.com/shricodev/gophercast/pkg/types"
 )
 
+// LogLevel represents the logging level.
 type LogLevel string
 
 const (
@@ -23,18 +24,21 @@ const (
 	LevelError LogLevel = "error"
 )
 
+// Config holds the configuration for the logger.
 type Config struct {
 	Level      LogLevel
 	Output     string
 	TimeFormat string
 }
 
+// Logger is a wrapper around slog.Logger with additional configuration.
 type Logger struct {
 	*slog.Logger
 	config Config
 	writer io.Writer
 }
 
+// New creates a new Logger instance.
 func New(config Config) (*Logger, error) {
 	var writer io.Writer
 
@@ -80,6 +84,7 @@ func New(config Config) (*Logger, error) {
 	}, nil
 }
 
+// createFileWriter creates a file writer for logging.
 func createFileWriter(basePath types.Path) (io.Writer, error) {
 	now := time.Now()
 
@@ -103,6 +108,7 @@ func createFileWriter(basePath types.Path) (io.Writer, error) {
 	return file, nil
 }
 
+// convertLogLevel converts a LogLevel string to a slog.Level.
 func convertLogLevel(level LogLevel) slog.Level {
 	switch level {
 	case LevelDebug:
@@ -118,44 +124,54 @@ func convertLogLevel(level LogLevel) slog.Level {
 	}
 }
 
+// Debug logs a debug message.
 func (l *Logger) Debug(msg string, args ...any) {
 	l.Logger.Debug(msg, args...)
 }
 
+// Info logs an info message.
 func (l *Logger) Info(msg string, args ...any) {
 	l.Logger.Info(msg, args...)
 }
 
+// Warn logs a warning message.
 func (l *Logger) Warn(msg string, args ...any) {
 	l.Logger.Warn(msg, args...)
 }
 
+// Error logs an error message.
 func (l *Logger) Error(msg string, args ...any) {
 	l.Logger.Error(msg, args...)
 }
 
+// DebugContext logs a debug message with context.
 func (l *Logger) DebugContext(ctx context.Context, msg string, args ...any) {
 	l.Logger.DebugContext(ctx, msg, args...)
 }
 
+// InfoContext logs an info message with context.
 func (l *Logger) InfoContext(ctx context.Context, msg string, args ...any) {
 	l.Logger.InfoContext(ctx, msg, args...)
 }
 
+// WarnContext logs a warning message with context.
 func (l *Logger) WarnContext(ctx context.Context, msg string, args ...any) {
 	l.Logger.WarnContext(ctx, msg, args...)
 }
 
+// ErrorContext logs an error message with context.
 func (l *Logger) ErrorContext(ctx context.Context, msg string, args ...any) {
 	l.Logger.ErrorContext(ctx, msg, args...)
 }
 
+// ClientConnected logs a client connection event.
 func (l *Logger) ClientConnected(clientID string, clientIP string) {
 	l.Info("client connected", slog.String("event", "client_connected"),
 		slog.String("client_id", clientID), slog.String("client_ip", clientIP),
 		slog.Time("timestamp", time.Now()))
 }
 
+// ClientDisconnected logs a client disconnection event.
 func (l *Logger) ClientDisconnected(clientID string, reason string) {
 	l.Info("client disconnected", slog.String("event", "client_disconnected"),
 		slog.String("client_id", clientID), slog.String("reason", reason),
@@ -163,6 +179,7 @@ func (l *Logger) ClientDisconnected(clientID string, reason string) {
 	)
 }
 
+// PlaylistCreated logs a playlist creation event.
 func (l *Logger) PlaylistCreated(playlistID string, trackCount int) {
 	l.Info("Playlist created", slog.String("event", "playlist_created"),
 		slog.String("playlist_id", playlistID), slog.Int("track_count",
@@ -170,6 +187,7 @@ func (l *Logger) PlaylistCreated(playlistID string, trackCount int) {
 	)
 }
 
+// TrackPlayed logs a track played event.
 func (l *Logger) TrackPlayed(trackID string, clientID string, duration time.Duration) {
 	l.Info("track played", slog.String("event", "track_played"),
 		slog.String("track_id", trackID), slog.String("client_id", clientID),
@@ -178,18 +196,21 @@ func (l *Logger) TrackPlayed(trackID string, clientID string, duration time.Dura
 	)
 }
 
+// ServerStarted logs a server started event.
 func (l *Logger) ServerStarted(port int) {
 	l.Info("server started", slog.String("event", "server_started"),
 		slog.Int("port", port), slog.Time("timestamp", time.Now()),
 	)
 }
 
+// ServerStopped logs a server stopped event.
 func (l *Logger) ServerStopped(reason string) {
 	l.Info("server stopped", slog.String("event", "server_stopped"),
 		slog.String("reason", reason), slog.Time("timestamp", time.Now()),
 	)
 }
 
+// ErrorOccurred logs an error event.
 func (l *Logger) ErrorOccurred(err error, context string) {
 	l.Error("error occurred", slog.String("event", "error"),
 		slog.String("error", err.Error()), slog.String("context", context),
@@ -197,6 +218,7 @@ func (l *Logger) ErrorOccurred(err error, context string) {
 	)
 }
 
+// Close closes the logger's output writer if it's an io.Closer.
 func (l *Logger) Close() error {
 	if closer, ok := l.writer.(io.Closer); ok {
 		return closer.Close()
@@ -204,12 +226,14 @@ func (l *Logger) Close() error {
 	return nil
 }
 
+// RotatingFileLogger is a logger that rotates log files daily.
 type RotatingFileLogger struct {
 	*Logger
 	basePath    string
 	currentDate string
 }
 
+// NewRotatingFileLogger creates a new RotatingFileLogger instance.
 func NewRotatingFileLogger(config Config) (*RotatingFileLogger, error) {
 	if strings.ToLower(config.Output) == "stdout" {
 		return nil, fmt.Errorf("rotating logger requires a file path, got stdout")
@@ -227,6 +251,7 @@ func NewRotatingFileLogger(config Config) (*RotatingFileLogger, error) {
 	}, nil
 }
 
+// checkAndRotate checks if the log file needs to be rotated and rotates it if necessary.
 func (r *RotatingFileLogger) checkAndRotate() error {
 	today := time.Now().Format("2006-01-02")
 	if today != r.currentDate {
@@ -247,22 +272,25 @@ func (r *RotatingFileLogger) checkAndRotate() error {
 	return nil
 }
 
-// Info override logging methods to include rotation check
+// Info logs an info message, rotating the log file if necessary.
 func (r *RotatingFileLogger) Info(msg string, args ...any) {
 	r.checkAndRotate()
 	r.Logger.Info(msg, args...)
 }
 
+// Debug logs an info message, rotating the log file if necessary.
 func (r *RotatingFileLogger) Debug(msg string, args ...any) {
 	r.checkAndRotate()
 	r.Logger.Debug(msg, args...)
 }
 
+// Warn logs an info message, rotating the log file if necessary.
 func (r *RotatingFileLogger) Warn(msg string, args ...any) {
 	r.checkAndRotate()
 	r.Logger.Warn(msg, args...)
 }
 
+// Error logs an info message, rotating the log file if necessary.
 func (r *RotatingFileLogger) Error(msg string, args ...any) {
 	r.checkAndRotate()
 	r.Logger.Error(msg, args...)

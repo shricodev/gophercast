@@ -1,3 +1,4 @@
+// Package main is the entry point of the Gophercast application.
 package main
 
 import "github.com/shricodev/gophercast/cmd"
@@ -18,6 +19,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// main is the entry point of the application.
 func main() {
 	cmd.Execute()
 

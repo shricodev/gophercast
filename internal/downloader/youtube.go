@@ -1,4 +1,4 @@
-// Package downloader handles YouTube downloads: videos and playlists
+// Package downloader provides functionality for downloading YouTube videos and playlists.
 package downloader
 
 import (
@@ -150,6 +150,7 @@ func (d *Downloader) DownloadPlaylist(url string) (*types.Playlist, error) {
 	return tracks, nil
 }
 
+// SetProgressCallback sets the progress callback function.
 func (d *Downloader) SetProgressCallback(progressCallback ProgressCallback) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -157,6 +158,7 @@ func (d *Downloader) SetProgressCallback(progressCallback ProgressCallback) {
 	d.progressCallback = progressCallback
 }
 
+// Shutdown gracefully shuts down the downloader, waiting for all active downloads to complete.
 func (d *Downloader) Shutdown() {
 	d.mu.Lock()
 	if d.isShutdown {
@@ -171,6 +173,7 @@ func (d *Downloader) Shutdown() {
 	d.wg.Wait()
 }
 
+// IsShutdown returns true if the downloader is in a shutdown state.
 func (d *Downloader) IsShutdown() bool {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
