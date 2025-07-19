@@ -88,6 +88,13 @@ func (d *Downloader) DownloadVideo(url string) (types.Track, error) {
 	sanitizedTitle := sanitizeFilename(title)
 
 	outputPath := filepath.Join(d.config.OutputDir.String(), sanitizedTitle+"."+d.config.Format)
+	if _, err := os.Stat(outputPath); err == nil {
+		return types.Track{
+			Title:  title,
+			Path:   types.Path(outputPath),
+			Source: types.SourceYoutube,
+		}, nil
+	}
 
 	cmd := exec.Command("yt-dlp",
 		"--extract-audio",
@@ -292,8 +299,8 @@ func (d *Downloader) downloadVideosConcurrently(
 	return &tracks, nil
 }
 
-// downloadSingleVideo downloads a single video from a playlist.
-func (d *Downloader) downloadSingleVideo(
+// downloadSingleVideoFromYtPlaylist downloads a single video from a playlist.
+func (d *Downloader) downloadSingleVideoFromYtPlaylist(
 	video PlaylistVideo,
 	outputDir types.Path,
 ) (types.Track, error) {
@@ -305,6 +312,13 @@ func (d *Downloader) downloadSingleVideo(
 
 	sanitizedTitle := sanitizeFilename(video.Title)
 	outputPath := filepath.Join(outputDir.String(), sanitizedTitle+"."+d.config.Format)
+	if _, err := os.Stat(outputPath); err == nil {
+		return types.Track{
+			Title:  video.Title,
+			Path:   types.Path(outputPath),
+			Source: types.SourceYoutubePlaylist,
+		}, nil
+	}
 
 	cmd := exec.CommandContext(d.ctx, "yt-dlp",
 		"--extract-audio",
@@ -323,7 +337,7 @@ func (d *Downloader) downloadSingleVideo(
 	track := types.Track{
 		Title:  video.Title,
 		Path:   types.Path(outputPath),
-		Source: types.SourceYoutube,
+		Source: types.SourceYoutubePlaylist,
 	}
 
 	return track, nil
@@ -395,7 +409,7 @@ func (d *Downloader) worker(
 			}
 			d.mu.Unlock()
 
-			track, err := d.downloadSingleVideo(video, outputDir)
+			track, err := d.downloadSingleVideoFromYtPlaylist(video, outputDir)
 
 			select {
 			case results <- downloadResult{

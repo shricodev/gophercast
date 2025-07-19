@@ -96,7 +96,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if info, err := os.Stat(selectedPath); err == nil && info.IsDir() {
 						m.dirToMp3 = types.Path(selectedPath)
 						m.state = screenAppStarting
-						return m, tea.Batch(m.spinner.Tick, run)
+						return m, m.spinner.Tick
 					}
 				}
 			case screenInputYoutube:
@@ -128,7 +128,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if currentDir != "" {
 					m.dirToMp3 = types.Path(currentDir)
 					m.state = screenAppStarting
-					return m, tea.Batch(m.spinner.Tick, run)
+					return m, m.spinner.Tick
 				}
 			}
 

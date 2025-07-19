@@ -6,10 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
+	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -23,13 +20,6 @@ var (
 	helpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Padding(1, 0)
 )
 
-// run is a placeholder for the actual work that needs to be done.
-func run() tea.Msg {
-	// perform the actual work
-	time.Sleep(2 * time.Second)
-	return appStartedMsg{}
-}
-
 // downloadYouTubeVideo downloads a YouTube video and returns a message.
 func downloadYouTubeVideo(url string, d *downloader.Downloader) tea.Cmd {
 	return func() tea.Msg {
@@ -41,10 +31,10 @@ func downloadYouTubeVideo(url string, d *downloader.Downloader) tea.Cmd {
 			}
 		})
 
-		resultChan := make(chan downloadResult, 1)
+		resultChan := make(chan downloadVideoResult, 1)
 		go func() {
 			track, err := d.DownloadVideo(url)
-			resultChan <- downloadResult{
+			resultChan <- downloadVideoResult{
 				track: track,
 				err:   err,
 			}
@@ -83,10 +73,10 @@ func downloadYouTubePlaylist(url string, d *downloader.Downloader) tea.Cmd {
 			}
 		})
 
-		resultChan := make(chan playlistResult, 1)
+		resultChan := make(chan downloadPlaylistResult, 1)
 		go func() {
 			tracks, err := d.DownloadPlaylist(url)
-			resultChan <- playlistResult{
+			resultChan <- downloadPlaylistResult{
 				tracks: tracks,
 				err:    err,
 			}
@@ -109,7 +99,8 @@ func downloadYouTubePlaylist(url string, d *downloader.Downloader) tea.Cmd {
 				if result.tracks != nil {
 					tracks = *result.tracks
 					if tracks.Len() > 0 {
-						dirPath = tracks[0].Path
+						audioPath := tracks[0].Path
+						dirPath = types.Path(filepath.Dir(audioPath.String()))
 					}
 				}
 
@@ -129,16 +120,6 @@ func Start() (types.Path, string, string) {
 	m := InitialModel()
 	p := tea.NewProgram(m)
 
-	go func() {
-		quitCh := make(chan os.Signal, 1)
-		signal.Notify(quitCh, syscall.SIGINT, syscall.SIGTERM)
-
-		<-quitCh
-
-		fmt.Println("shutdown requested")
-		p.Quit()
-	}()
-
 	finalModel, err := p.Run()
 	if err != nil {
 		log.Fatal(err)
@@ -152,12 +133,12 @@ func Start() (types.Path, string, string) {
 	return mo.dirToMp3, mo.youtubePlaylistURL, mo.youtubeURL
 }
 
-type downloadResult struct {
+type downloadVideoResult struct {
 	track types.Track
 	err   error
 }
 
-type playlistResult struct {
+type downloadPlaylistResult struct {
 	tracks *types.Playlist
 	err    error
 }
