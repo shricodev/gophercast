@@ -3,8 +3,6 @@ package client
 import (
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/gorilla/websocket"
 )
@@ -63,27 +61,27 @@ func (c *AudioClient) Close() {
 }
 
 // main function to run the audio client.
-func main() {
-	serverURL := "ws://localhost:8080/ws"
-	outputFile := "received_audio.wav"
-
-	fmt.Printf("connecting to %s\n", serverURL)
-
-	client, err := NewAudioClient(serverURL, outputFile)
-	if err != nil {
-		fmt.Printf("error creating audio client: %v\n", err)
-		return
-	}
-	defer client.Close()
-
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-
-	go func() {
-		<-c
-		fmt.Println("shutting down")
-		os.Exit(0)
-	}()
-
-	client.Start()
-}
+// func main() {
+// 	serverURL := "ws://localhost:8080/ws"
+// 	outputFile := "received_audio.wav"
+//
+// 	fmt.Printf("connecting to %s\n", serverURL)
+//
+// 	client, err := NewAudioClient(serverURL, outputFile)
+// 	if err != nil {
+// 		fmt.Printf("error creating audio client: %v\n", err)
+// 		return
+// 	}
+// 	defer client.Close()
+//
+// 	c := make(chan os.Signal, 1)
+// 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+//
+// 	go func() {
+// 		<-c
+// 		fmt.Println("shutting down")
+// 		os.Exit(0)
+// 	}()
+//
+// 	client.Start()
+// }

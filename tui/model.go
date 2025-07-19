@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/charmbracelet/bubbles/filepicker"
@@ -20,7 +21,9 @@ import (
 type model struct {
 	state screen
 
-	list       list.Model
+	initialScreenList       list.Model
+	chooseTracksOptionsList list.Model
+
 	spinner    spinner.Model
 	progress   progress.Model
 	filePicker filepicker.Model
@@ -30,7 +33,11 @@ type model struct {
 	youtubeURL         string
 	youtubePlaylistURL string
 
+	youtubeDownloadPath         types.Path
+	youtubePlaylistDownloadPath types.Path
+
 	downloadedTracks types.Playlist
+
 	downloader       *downloader.Downloader
 	downloadConfig   *downloader.DownloadConfig
 	downloadProgress *downloader.DownloadProgress
@@ -57,7 +64,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		switch key {
 		case tea.KeyCtrlC.String():
-			if m.state == screenAppStarting && m.downloader != nil {
+			if m.state == screenDownloadStarting && m.downloader != nil {
 				if !m.isShuttingDown {
 					m.isShuttingDown = true
 					m.shutdownMessage = "Gracefully shutting down... Please wait for the download to finish."
@@ -72,7 +79,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyEnter.String():
 			switch m.state {
 			case screenMenu:
-				selectedItem := m.list.SelectedItem().(item)
+				selectedItem := m.initialScreenList.SelectedItem().(item)
 				switch selectedItem.title {
 				case directory:
 					m.state = screenPickDir
@@ -83,40 +90,46 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.textInput.Focus()
 					return m, textinput.Blink
 				case youtubePlaylist:
-					m.state = screenInputPlaylist
+					m.state = screenInputYoutubePlaylist
 					m.textInput.Placeholder = "Enter YouTube playlist URL..."
 					m.textInput.Focus()
 					return m, textinput.Blink
 				}
+
+			case screenDownloadComplete:
+				selectedItem := m.initialScreenList.SelectedItem().(item)
+				switch selectedItem.title {
+				case chooseTracksAuto:
+					m.state = screenStreamTracks
+					return m, nil
+				case chooseTracksManually:
+					m.state = screenChooseTracks
+					return m, nil
+				}
+
 			case screenPickDir:
 				selectedPath := m.filePicker.Path
 				if selectedPath != "" {
 					if info, err := os.Stat(selectedPath); err == nil && info.IsDir() {
 						m.dirToMp3 = types.Path(selectedPath)
-						m.state = screenAppStarting
+						m.state = screenDownloadStarting
 						return m, m.spinner.Tick
 					}
 				}
 			case screenInputYoutube:
 				if m.textInput.Value() != "" {
 					m.youtubeURL = m.textInput.Value()
-					m.state = screenAppStarting
+					m.state = screenDownloadStarting
 
-					config := downloader.DefaultConfig()
-					downloader := downloader.NewDownloader(config)
-
-					return m, tea.Batch(m.spinner.Tick, downloadYouTubeVideo(m.youtubeURL, downloader))
+					return m, tea.Batch(m.spinner.Tick, downloadYouTubeVideo(m.youtubeURL, m.downloader))
 				}
-			case screenInputPlaylist:
+			case screenInputYoutubePlaylist:
 				if m.textInput.Value() != "" {
 					m.youtubePlaylistURL = m.textInput.Value()
-					m.state = screenAppStarting
+					m.state = screenDownloadStarting
 					m.showDownloadProgress = true
 
-					config := downloader.DefaultConfig()
-					downloader := downloader.NewDownloader(config)
-
-					return m, tea.Batch(m.spinner.Tick, downloadYouTubePlaylist(m.youtubePlaylistURL, downloader))
+					return m, tea.Batch(m.spinner.Tick, downloadYouTubePlaylist(m.youtubePlaylistURL, m.downloader))
 				}
 			}
 
@@ -125,14 +138,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				currentDir := m.filePicker.CurrentDirectory
 				if currentDir != "" {
 					m.dirToMp3 = types.Path(currentDir)
-					m.state = screenAppStarting
+					m.state = screenDownloadStarting
 					return m, m.spinner.Tick
 				}
 			}
 
 		case tea.KeyEsc.String():
 			switch m.state {
-			case screenPickDir, screenInputYoutube, screenInputPlaylist:
+			case screenPickDir, screenInputYoutube, screenInputYoutubePlaylist:
 				m.state = screenMenu
 				return m, nil
 			}
@@ -143,7 +156,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Removing -30 after removing the vertical margin seems to work well
 		// with the UI. This is a completely arbitrary value.
-		m.list.SetSize(msg.Width-hor, msg.Height-ver-30)
+		m.initialScreenList.SetSize(msg.Width-hor, msg.Height-ver-30)
 
 		// Here again, arbitrary values. Subtracting 40 from the height makes
 		// it look nice in the UI.
@@ -163,8 +176,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case downloadCompleteMsg:
 		m.downloadedTracks = msg.tracks
-		m.dirToMp3 = msg.path
-		m.state = screenAppRunning
+
+		if m.youtubeURL != "" {
+			m.youtubeDownloadPath = msg.path
+		} else if m.youtubePlaylistURL != "" {
+			m.youtubePlaylistDownloadPath = msg.path
+		}
+
+		m.state = screenChooseTracks
 		m.showDownloadProgress = false
 
 		if m.downloader != nil {
@@ -174,7 +193,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case appStartedMsg:
-		m.state = screenAppRunning
+		m.state = screenChooseTracks
 		return m, nil
 
 	case shutdownCompleteMsg:
@@ -195,15 +214,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch m.state {
 	case screenMenu:
-		m.list, cmd = m.list.Update(msg)
+		m.initialScreenList, cmd = m.initialScreenList.Update(msg)
 		cmds = append(cmds, cmd)
 	case screenPickDir:
 		m.filePicker, cmd = m.filePicker.Update(msg)
 		cmds = append(cmds, cmd)
-	case screenInputYoutube, screenInputPlaylist:
+	case screenInputYoutube, screenInputYoutubePlaylist:
 		m.textInput, cmd = m.textInput.Update(msg)
 		cmds = append(cmds, cmd)
-	case screenAppStarting:
+	case screenDownloadStarting:
 		m.spinner, cmd = m.spinner.Update(msg)
 		cmds = append(cmds, cmd)
 	}
@@ -213,14 +232,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // InitialModel returns the initial model for the TUI.
 func InitialModel() model {
-	items := []list.Item{
+	initialScreenChoices := []list.Item{
 		item{title: directory, desc: "Pick a directory with mp3 files"},
 		item{title: youtube, desc: "Provide a YouTube video URL"},
 		item{title: youtubePlaylist, desc: "Provide a YouTube playlist URL"},
 	}
 
-	l := list.New(items, list.NewDefaultDelegate(), 0, 0)
-	l.Title = "Select source"
+	chooseTracksOptions := []list.Item{
+		item{title: chooseTracksAuto, desc: "Select and run the mp3 files in random"},
+		item{title: chooseTracksManually, desc: "Select the mp3 files manually"},
+	}
+
+	initialScreenChoicesList := list.New(initialScreenChoices, list.NewDefaultDelegate(), 0, 0)
+	initialScreenChoicesList.Title = "Select source"
+
+	chooseTracksOptionsList := list.New(chooseTracksOptions, list.NewDefaultDelegate(), 0, 0)
+	chooseTracksOptionsList.Title = "Track selection method"
 
 	fp := filepicker.New()
 	fp.DirAllowed = true
@@ -260,7 +287,9 @@ func InitialModel() model {
 	return model{
 		state: screenMenu,
 
-		list:       l,
+		initialScreenList:       initialScreenChoicesList,
+		chooseTracksOptionsList: chooseTracksOptionsList,
+
 		spinner:    s,
 		progress:   p,
 		filePicker: fp,

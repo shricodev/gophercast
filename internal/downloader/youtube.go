@@ -8,10 +8,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 
+	"github.com/shricodev/gophercast/internal/utils"
 	"github.com/shricodev/gophercast/pkg/types"
 )
 
@@ -69,11 +69,11 @@ func (d *Downloader) DownloadVideo(url string) (types.Track, error) {
 		return types.Track{}, errDownloaderShutdown
 	}
 
-	if err := checkYtDlp(); err != nil {
+	if err := utils.CheckYtDlp(); err != nil {
 		return types.Track{}, err
 	}
 
-	if err := ensureDir(d.config.OutputDir); err != nil {
+	if err := utils.EnsureDir(d.config.OutputDir); err != nil {
 		return types.Track{}, fmt.Errorf("failed to create output directory: %w", err)
 	}
 
@@ -84,7 +84,7 @@ func (d *Downloader) DownloadVideo(url string) (types.Track, error) {
 	}
 
 	title := strings.TrimSpace(string(titleBytes))
-	sanitizedTitle := sanitizeFilename(title)
+	sanitizedTitle := utils.SanitizeFilename(title)
 
 	outputPath := filepath.Join(d.config.OutputDir.String(), sanitizedTitle+"."+d.config.Format)
 	if _, err := os.Stat(outputPath); err == nil {
@@ -121,7 +121,7 @@ func (d *Downloader) DownloadPlaylist(url string) (*types.Playlist, error) {
 		return nil, errDownloaderShutdown
 	}
 
-	if err := checkYtDlp(); err != nil {
+	if err := utils.CheckYtDlp(); err != nil {
 		return nil, err
 	}
 
@@ -134,10 +134,10 @@ func (d *Downloader) DownloadPlaylist(url string) (*types.Playlist, error) {
 		return nil, fmt.Errorf("playlist is empty or could not extract video URLs")
 	}
 
-	sanitizedPlaylistTitle := sanitizeFilename(playlistInfo.Title)
+	sanitizedPlaylistTitle := utils.SanitizeFilename(playlistInfo.Title)
 	playlistDir := types.Path(filepath.Join(d.config.OutputDir.String(), sanitizedPlaylistTitle))
 
-	if err = ensureDir(types.Path(playlistDir)); err != nil {
+	if err = utils.EnsureDir(types.Path(playlistDir)); err != nil {
 		return nil, fmt.Errorf("failed to create playlist directory: %w", err)
 	}
 
@@ -309,7 +309,7 @@ func (d *Downloader) downloadSingleVideoFromYtPlaylist(
 
 	videoURL := fmt.Sprintf("https://youtube.com/watch?v=%s", video.ID)
 
-	sanitizedTitle := sanitizeFilename(video.Title)
+	sanitizedTitle := utils.SanitizeFilename(video.Title)
 	outputPath := filepath.Join(outputDir.String(), sanitizedTitle+"."+d.config.Format)
 	if _, err := os.Stat(outputPath); err == nil {
 		return types.Track{
@@ -424,35 +424,4 @@ func (d *Downloader) worker(
 			return
 		}
 	}
-}
-
-// sanitizeFilename cleans up filenames for safe storage.
-func sanitizeFilename(filename string) string {
-	filename = strings.ToLower(filename)
-
-	filename = strings.ReplaceAll(filename, " ", "_")
-
-	reg := regexp.MustCompile(`[^a-zA-Z0-9\-_.]`)
-	filename = reg.ReplaceAllString(filename, "")
-
-	reg = regexp.MustCompile(`_+`)
-	filename = reg.ReplaceAllString(filename, "_")
-
-	filename = strings.Trim(filename, "_")
-
-	return filename
-}
-
-// ensureDir creates directory if it doesn't exist.
-func ensureDir(path types.Path) error {
-	return os.MkdirAll(path.String(), 0755)
-}
-
-// checkYtDlp verifies yt-dlp is installed.
-func checkYtDlp() error {
-	_, err := exec.LookPath("yt-dlp")
-	if err != nil {
-		return fmt.Errorf("yt-dlp not found: %w\nPlease install with: pip install yt-dlp", err)
-	}
-	return nil
 }

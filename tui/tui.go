@@ -16,7 +16,10 @@ import (
 const (
 	directory       = "Directory"
 	youtube         = "YouTube"
-	youtubePlaylist = "Playlist"
+	youtubePlaylist = "YouTube Playlist"
+
+	chooseTracksManually = "Manually"
+	chooseTracksAuto     = "Auto"
 )
 
 type screen int
@@ -25,9 +28,11 @@ const (
 	screenMenu screen = iota
 	screenPickDir
 	screenInputYoutube
-	screenInputPlaylist
-	screenAppStarting
-	screenAppRunning
+	screenInputYoutubePlaylist
+	screenDownloadStarting
+	screenDownloadComplete
+	screenChooseTracks
+	screenStreamTracks
 )
 
 var (

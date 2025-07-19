@@ -33,7 +33,7 @@ func (m model) View() string {
 	var body string
 	switch m.state {
 	case screenMenu:
-		body = m.list.View()
+		body = m.initialScreenList.View()
 
 	case screenPickDir:
 		body = lipgloss.JoinVertical(lipgloss.Left,
@@ -52,7 +52,7 @@ func (m model) View() string {
 			helpStyle.Render("Enter: Confirm, Esc: Back"),
 		)
 
-	case screenInputPlaylist:
+	case screenInputYoutubePlaylist:
 		body = lipgloss.JoinVertical(lipgloss.Left,
 			"Enter YouTube Playlist URL:",
 			"",
@@ -61,7 +61,10 @@ func (m model) View() string {
 			helpStyle.Render("Enter: Confirm, Esc: Back"),
 		)
 
-	case screenAppStarting:
+	case screenDownloadComplete:
+		body = m.chooseTracksOptionsList.View()
+
+	case screenDownloadStarting:
 		var message string
 		var components []string
 
@@ -139,7 +142,7 @@ func (m model) View() string {
 
 		body = lipgloss.JoinVertical(lipgloss.Left, components...)
 
-	case screenAppRunning:
+	case screenStreamTracks:
 		var components []string
 
 		components = append(components, "Server running!")
