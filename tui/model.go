@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/charmbracelet/bubbles/filepicker"

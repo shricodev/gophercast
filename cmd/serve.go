@@ -37,7 +37,6 @@ youtube URL or a youtube playlist URL.
 			fmt.Println(ytPlaylist)
 		default:
 			_, _, _ = tui.Start()
-			// fmt.Println(d, y, p)
 		}
 	},
 }
