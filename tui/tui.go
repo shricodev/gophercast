@@ -2,7 +2,6 @@ package tui
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"path/filepath"
 
@@ -66,7 +65,7 @@ func downloadYouTubeVideo(url string, d *downloader.Downloader) tea.Cmd {
 		for {
 			select {
 			case progress := <-progressChan:
-				fmt.Println(progress)
+				log.Printf("Downloading: %s", progress.Current)
 			case result := <-resultChan:
 				if result.err != nil {
 					return errMsg{err: result.err}
@@ -109,6 +108,8 @@ func downloadYouTubePlaylist(url string, d *downloader.Downloader) tea.Cmd {
 			select {
 			case progress := <-progressChan:
 				_ = progress
+				// log.Println(progress)
+
 			case result := <-resultChan:
 				if result.err != nil {
 					return errMsg{result.err}
@@ -124,6 +125,7 @@ func downloadYouTubePlaylist(url string, d *downloader.Downloader) tea.Cmd {
 					}
 				}
 
+				log.Printf("Download complete: %v", tracks)
 				return downloadCompleteMsg{
 					tracks: tracks,
 					path:   dirPath,

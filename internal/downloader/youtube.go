@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/shricodev/gophercast/internal/utils"
 	"github.com/shricodev/gophercast/pkg/types"
@@ -77,25 +78,39 @@ func (d *Downloader) DownloadVideo(url string) (types.Track, error) {
 		return types.Track{}, fmt.Errorf("failed to create output directory: %w", err)
 	}
 
-	infoCmd := exec.Command("yt-dlp", "--get-title", url)
-	titleBytes, err := infoCmd.Output()
+	type ytDlpInfo struct {
+		Title    string `json:"title"`
+		Duration int    `json:"duration"`
+	}
+
+	var info ytDlpInfo
+	infoCmd := exec.CommandContext(d.ctx, "yt-dlp", "--no-warnings", "--dump-single-json", url)
+	infoBytes, err := infoCmd.Output()
 	if err != nil {
+		if d.ctx.Err() == context.Canceled {
+			return types.Track{}, errDownloadCancelled
+		}
 		return types.Track{}, fmt.Errorf("failed to get video info: %w", err)
 	}
 
-	title := strings.TrimSpace(string(titleBytes))
-	sanitizedTitle := utils.SanitizeFilename(title)
+	if err := json.Unmarshal(infoBytes, &info); err != nil {
+		return types.Track{}, fmt.Errorf("failed to parse JSON from yt-dlp: %w", err)
+	}
+
+	sanitizedTitle := utils.SanitizeFilename(info.Title)
 
 	outputPath := filepath.Join(d.config.OutputDir.String(), sanitizedTitle+"."+d.config.Format)
 	if _, err := os.Stat(outputPath); err == nil {
 		return types.Track{
-			Title:  title,
-			Path:   types.Path(outputPath),
-			Source: types.SourceYoutube,
+			Title:     info.Title,
+			Path:      types.Path(outputPath),
+			Source:    types.SourceYoutube,
+			Duration:  time.Second * time.Duration(info.Duration),
+			IsPlaying: false,
 		}, nil
 	}
 
-	cmd := exec.Command("yt-dlp",
+	cmd := exec.CommandContext(d.ctx, "yt-dlp",
 		"--extract-audio",
 		"--audio-format", d.config.Format,
 		"--audio-quality", d.config.Quality,
@@ -103,13 +118,18 @@ func (d *Downloader) DownloadVideo(url string) (types.Track, error) {
 		url)
 
 	if err := cmd.Run(); err != nil {
+		if d.ctx.Err() == context.Canceled {
+			return types.Track{}, errDownloadCancelled
+		}
 		return types.Track{}, fmt.Errorf("failed to download video: %w", err)
 	}
 
 	track := types.Track{
-		Title:  title,
-		Path:   types.Path(outputPath),
-		Source: types.SourceYoutube,
+		Title:     info.Title,
+		Path:      types.Path(outputPath),
+		Source:    types.SourceYoutube,
+		Duration:  time.Second * time.Duration(info.Duration),
+		IsPlaying: false,
 	}
 
 	return track, nil
@@ -309,13 +329,33 @@ func (d *Downloader) downloadSingleVideoFromYtPlaylist(
 
 	videoURL := fmt.Sprintf("https://youtube.com/watch?v=%s", video.ID)
 
+	type ytDlpInfo struct {
+		Duration int `json:"duration"`
+	}
+
+	var info ytDlpInfo
+	infoCmd := exec.CommandContext(d.ctx, "yt-dlp", "--no-warnings", "--dump-single-json", videoURL)
+	infoBytes, err := infoCmd.Output()
+	if err != nil {
+		if d.ctx.Err() == context.Canceled {
+			return types.Track{}, errDownloadCancelled
+		}
+		return types.Track{}, fmt.Errorf("failed to get video info: %w", err)
+	}
+
+	if err := json.Unmarshal(infoBytes, &info); err != nil {
+		return types.Track{}, fmt.Errorf("failed to parse video info: %w", err)
+	}
+
 	sanitizedTitle := utils.SanitizeFilename(video.Title)
 	outputPath := filepath.Join(outputDir.String(), sanitizedTitle+"."+d.config.Format)
 	if _, err := os.Stat(outputPath); err == nil {
 		return types.Track{
-			Title:  video.Title,
-			Path:   types.Path(outputPath),
-			Source: types.SourceYoutubePlaylist,
+			Title:     video.Title,
+			Path:      types.Path(outputPath),
+			Source:    types.SourceYoutubePlaylist,
+			Duration:  time.Second * time.Duration(info.Duration),
+			IsPlaying: false,
 		}, nil
 	}
 
@@ -334,9 +374,11 @@ func (d *Downloader) downloadSingleVideoFromYtPlaylist(
 	}
 
 	track := types.Track{
-		Title:  video.Title,
-		Path:   types.Path(outputPath),
-		Source: types.SourceYoutubePlaylist,
+		Title:     video.Title,
+		Path:      types.Path(outputPath),
+		Source:    types.SourceYoutubePlaylist,
+		Duration:  time.Second * time.Duration(info.Duration),
+		IsPlaying: false,
 	}
 
 	return track, nil
