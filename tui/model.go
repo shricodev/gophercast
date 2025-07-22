@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/charmbracelet/bubbles/filepicker"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -22,6 +23,7 @@ type model struct {
 
 	initialScreenList       list.Model
 	chooseTracksOptionsList list.Model
+	selectedTracksList      list.Model
 
 	spinner    spinner.Model
 	progress   progress.Model
@@ -36,6 +38,7 @@ type model struct {
 	youtubePlaylistDownloadPath types.Path
 
 	downloadedTracks types.Playlist
+	selectedTracks   types.Playlist
 
 	downloader       *downloader.Downloader
 	downloadConfig   *downloader.DownloadConfig
@@ -102,6 +105,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.state = screenStreamTracks
 					return m, nil
 				case chooseTracksManually:
+					m.selectedTracksList = newSelectedTracksList(m.downloadedTracks)
+					// log.Println("selectedTracksList count", m.selectedTracksList.Items(), m.selectedTracksList.Title)
 					m.state = screenChooseTracks
 					return m, nil
 				}
@@ -133,10 +138,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, tea.Batch(m.spinner.Tick, downloadYouTubePlaylist(m.youtubePlaylistURL, m.downloader))
 				}
 
-			case screenStreamTracks:
-				if m.downloadedTracks.Len() > 0 {
-					// do something, like create and populate the list.
-					// with songs.
+			case screenChooseTracks:
+				selectedTracks := types.Playlist{}
+				for _, itm := range m.selectedTracksList.Items() {
+					if i, ok := itm.(item); ok && i.selected {
+						for _, t := range m.downloadedTracks {
+							if t.Title == i.title {
+								selectedTracks = append(selectedTracks, t)
+							}
+						}
+					}
+				}
+
+				m.selectedTracks = selectedTracks
+				return m, nil
+			}
+
+		case tea.KeySpace.String():
+			if m.state == screenChooseTracks {
+				if itm, ok := m.selectedTracksList.SelectedItem().(item); ok {
+					itm.selected = !itm.selected
+					m.selectedTracksList.SetItem(m.selectedTracksList.Index(), itm)
 				}
 			}
 
@@ -165,6 +187,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// with the UI. This is a completely arbitrary value.
 		m.initialScreenList.SetSize(msg.Width-hor, msg.Height-ver-30)
 		m.chooseTracksOptionsList.SetSize(msg.Width-hor, msg.Height-ver-30)
+		m.selectedTracksList.SetSize(msg.Width-hor, msg.Height-ver-30)
 
 		// Here again, arbitrary values. Subtracting 40 from the height makes
 		// it look nice in the UI.
@@ -236,6 +259,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case screenChooseTracksOptions:
 		m.chooseTracksOptionsList, cmd = m.chooseTracksOptionsList.Update(msg)
 		cmds = append(cmds, cmd)
+	case screenChooseTracks:
+		m.selectedTracksList, cmd = m.selectedTracksList.Update(msg)
+		cmds = append(cmds, cmd)
 	}
 
 	return m, tea.Batch(cmds...)
@@ -259,6 +285,8 @@ func InitialModel() model {
 
 	chooseTracksOptionsList := list.New(chooseTracksOptions, list.NewDefaultDelegate(), 0, 0)
 	chooseTracksOptionsList.Title = "Track selection method"
+
+	selectedTracksList := list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0)
 
 	fp := filepicker.New()
 	fp.DirAllowed = true
@@ -300,6 +328,7 @@ func InitialModel() model {
 
 		initialScreenList:       initialScreenChoicesList,
 		chooseTracksOptionsList: chooseTracksOptionsList,
+		selectedTracksList:      selectedTracksList,
 
 		spinner:    s,
 		progress:   p,
@@ -322,11 +351,32 @@ func shutdown(d *downloader.Downloader) tea.Cmd {
 	}
 }
 
+func newSelectedTracksList(tracks types.Playlist) list.Model {
+	items := make([]list.Item, len(tracks))
+	for i, track := range tracks {
+		items[i] = item{title: track.Title, desc: track.Path.String()}
+	}
+
+	l := list.New(items, list.NewDefaultDelegate(), 0, 0)
+	// log.Println("inside the newSelectedTracksList", l.Items())
+	l.Title = "randi"
+	// log.Println("title", l.Title)
+	l.SetHeight(20)
+	l.AdditionalShortHelpKeys = func() []key.Binding {
+		return []key.Binding{
+			key.NewBinding(key.WithKeys(tea.KeySpace.String()), key.WithHelp("Space", "toggle select")),
+		}
+	}
+
+	return l
+}
+
 // item is an item in the list that holds the title and the description. This
 // is what's shown in the initial page when the application runs with the serve
 // subcommand
 type item struct {
 	title, desc string
+	selected    bool
 }
 
 // Title satisfies the list.Item interface

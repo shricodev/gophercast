@@ -15,6 +15,7 @@ const (
 	directory       = "Directory"
 	youtube         = "YouTube"
 	youtubePlaylist = "YouTube Playlist"
+	chooseTracks    = "Choose Tracks"
 
 	chooseTracksManually = "Manually"
 	chooseTracksAuto     = "Auto"
@@ -61,7 +62,8 @@ func downloadYouTubeVideo(url string, d *downloader.Downloader) tea.Cmd {
 		for {
 			select {
 			case progress := <-progressChan:
-				log.Printf("Downloading: %s", progress.Current)
+				_ = progress
+				// log.Printf("Downloading: %s", progress.Current)
 			case result := <-resultChan:
 				if result.err != nil {
 					return errMsg{err: result.err}
@@ -116,7 +118,7 @@ func downloadYouTubePlaylist(url string, d *downloader.Downloader) tea.Cmd {
 					}
 				}
 
-				log.Printf("Download complete: %v", tracks)
+				// log.Printf("Download complete: %v", tracks)
 				return downloadCompleteMsg{
 					tracks: tracks,
 					path:   dirPath,
