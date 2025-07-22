@@ -61,7 +61,7 @@ func (m model) View() string {
 			helpStyle.Render("Enter: Confirm, Esc: Back"),
 		)
 
-	case screenDownloadComplete:
+	case screenChooseTracksOptions:
 		body = m.chooseTracksOptionsList.View()
 
 	case screenDownloadStarting:
@@ -154,8 +154,8 @@ func (m model) View() string {
 				fmt.Sprintf("Downloaded %d tracks successfully!", m.downloadedTracks.Len()),
 			)
 
-			if m.dirToMp3 != "" {
-				components = append(components, fmt.Sprintf("Location: %s", m.dirToMp3))
+			if m.dirToMp3Path != "" {
+				components = append(components, fmt.Sprintf("Location: %s", m.dirToMp3Path))
 			}
 		}
 

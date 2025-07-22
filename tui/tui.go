@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"context"
 	"log"
 	"path/filepath"
 
@@ -29,7 +28,7 @@ const (
 	screenInputYoutube
 	screenInputYoutubePlaylist
 	screenDownloadStarting
-	screenDownloadComplete
+	screenChooseTracksOptions
 	screenChooseTracks
 	screenStreamTracks
 )
@@ -59,9 +58,6 @@ func downloadYouTubeVideo(url string, d *downloader.Downloader) tea.Cmd {
 			}
 		}()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
 		for {
 			select {
 			case progress := <-progressChan:
@@ -74,8 +70,6 @@ func downloadYouTubeVideo(url string, d *downloader.Downloader) tea.Cmd {
 					tracks: types.Playlist{result.track},
 					path:   result.track.Path,
 				}
-			case <-ctx.Done():
-				return errMsg{ctx.Err()}
 			}
 		}
 	}
@@ -101,14 +95,11 @@ func downloadYouTubePlaylist(url string, d *downloader.Downloader) tea.Cmd {
 			}
 		}()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
 		for {
 			select {
 			case progress := <-progressChan:
 				_ = progress
-				// log.Println(progress)
+			// log.Println(progress)
 
 			case result := <-resultChan:
 				if result.err != nil {
@@ -130,8 +121,6 @@ func downloadYouTubePlaylist(url string, d *downloader.Downloader) tea.Cmd {
 					tracks: tracks,
 					path:   dirPath,
 				}
-			case <-ctx.Done():
-				return errMsg{ctx.Err()}
 			}
 		}
 	}
@@ -152,7 +141,7 @@ func Start() (types.Path, string, string) {
 		mo.downloader.Shutdown()
 	}
 
-	return mo.dirToMp3, mo.youtubePlaylistURL, mo.youtubeURL
+	return mo.dirToMp3Path, mo.youtubePlaylistURL, mo.youtubeURL
 }
 
 type downloadVideoResult struct {

@@ -28,7 +28,7 @@ type model struct {
 	filePicker filepicker.Model
 	textInput  textinput.Model
 
-	dirToMp3           types.Path
+	dirToMp3Path       types.Path
 	youtubeURL         string
 	youtubePlaylistURL string
 
@@ -95,8 +95,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, textinput.Blink
 				}
 
-			case screenDownloadComplete:
-				selectedItem := m.initialScreenList.SelectedItem().(item)
+			case screenChooseTracksOptions:
+				selectedItem := m.chooseTracksOptionsList.SelectedItem().(item)
 				switch selectedItem.title {
 				case chooseTracksAuto:
 					m.state = screenStreamTracks
@@ -110,11 +110,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				selectedPath := m.filePicker.Path
 				if selectedPath != "" {
 					if info, err := os.Stat(selectedPath); err == nil && info.IsDir() {
-						m.dirToMp3 = types.Path(selectedPath)
+						m.dirToMp3Path = types.Path(selectedPath)
 						m.state = screenDownloadStarting
 						return m, m.spinner.Tick
 					}
 				}
+
 			case screenInputYoutube:
 				if m.textInput.Value() != "" {
 					m.youtubeURL = m.textInput.Value()
@@ -122,6 +123,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 					return m, tea.Batch(m.spinner.Tick, downloadYouTubeVideo(m.youtubeURL, m.downloader))
 				}
+
 			case screenInputYoutubePlaylist:
 				if m.textInput.Value() != "" {
 					m.youtubePlaylistURL = m.textInput.Value()
@@ -130,13 +132,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 					return m, tea.Batch(m.spinner.Tick, downloadYouTubePlaylist(m.youtubePlaylistURL, m.downloader))
 				}
+
+			case screenStreamTracks:
+				if m.downloadedTracks.Len() > 0 {
+					// do something, like create and populate the list.
+					// with songs.
+				}
 			}
 
 		case "d":
 			if m.state == screenPickDir {
 				currentDir := m.filePicker.CurrentDirectory
 				if currentDir != "" {
-					m.dirToMp3 = types.Path(currentDir)
+					m.dirToMp3Path = types.Path(currentDir)
 					m.state = screenDownloadStarting
 					return m, m.spinner.Tick
 				}
@@ -156,6 +164,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Removing -30 after removing the vertical margin seems to work well
 		// with the UI. This is a completely arbitrary value.
 		m.initialScreenList.SetSize(msg.Width-hor, msg.Height-ver-30)
+		m.chooseTracksOptionsList.SetSize(msg.Width-hor, msg.Height-ver-30)
 
 		// Here again, arbitrary values. Subtracting 40 from the height makes
 		// it look nice in the UI.
@@ -178,21 +187,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if m.youtubeURL != "" {
 			m.youtubeDownloadPath = msg.path
+			m.state = screenStreamTracks
 		} else if m.youtubePlaylistURL != "" {
 			m.youtubePlaylistDownloadPath = msg.path
+			m.state = screenChooseTracksOptions
+		} else if m.dirToMp3Path != "" {
+			m.dirToMp3Path = msg.path
+			m.state = screenChooseTracksOptions
 		}
 
-		m.state = screenChooseTracks
 		m.showDownloadProgress = false
 
 		if m.downloader != nil {
 			m.downloader.Shutdown()
 			m.downloader = nil
 		}
-		return m, nil
-
-	case appStartedMsg:
-		m.state = screenChooseTracks
 		return m, nil
 
 	case shutdownCompleteMsg:
@@ -223,6 +232,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	case screenDownloadStarting:
 		m.spinner, cmd = m.spinner.Update(msg)
+		cmds = append(cmds, cmd)
+	case screenChooseTracksOptions:
+		m.chooseTracksOptionsList, cmd = m.chooseTracksOptionsList.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 
@@ -327,7 +339,6 @@ func (i item) Description() string { return i.desc }
 func (i item) FilterValue() string { return i.title }
 
 type (
-	appStartedMsg       struct{}
 	shutdownCompleteMsg struct{}
 	downloadProgressMsg struct {
 		progress *downloader.DownloadProgress
