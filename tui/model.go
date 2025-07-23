@@ -105,8 +105,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.state = screenStreamTracks
 					return m, nil
 				case chooseTracksManually:
-					m.selectedTracksList = newSelectedTracksList(m.downloadedTracks)
-					// log.Println("selectedTracksList count", m.selectedTracksList.Items(), m.selectedTracksList.Title)
+					m.selectedTracks = m.downloadedTracks
+					m.selectedTracksList = newSelectedTracksList(m.selectedTracks)
+
 					m.state = screenChooseTracks
 					return m, nil
 				}
@@ -139,26 +140,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 			case screenChooseTracks:
-				selectedTracks := types.Playlist{}
-				for _, itm := range m.selectedTracksList.Items() {
-					if i, ok := itm.(item); ok && i.selected {
-						for _, t := range m.downloadedTracks {
-							if t.Title == i.title {
-								selectedTracks = append(selectedTracks, t)
-							}
-						}
-					}
-				}
-
-				m.selectedTracks = selectedTracks
+				m.selectedTracks = m.downloadedTracks
 				return m, nil
 			}
 
 		case tea.KeySpace.String():
 			if m.state == screenChooseTracks {
 				if itm, ok := m.selectedTracksList.SelectedItem().(item); ok {
-					itm.selected = !itm.selected
-					m.selectedTracksList.SetItem(m.selectedTracksList.Index(), itm)
+					newItem := item{
+						title:    itm.title,
+						desc:     itm.desc,
+						selected: !itm.selected,
+					}
+					index := m.selectedTracksList.Index()
+					m.selectedTracksList.SetItem(index, newItem)
 				}
 			}
 
@@ -183,20 +178,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		hor, ver := docStyle.GetFrameSize()
 
-		// Removing -30 after removing the vertical margin seems to work well
-		// with the UI. This is a completely arbitrary value.
-		m.initialScreenList.SetSize(msg.Width-hor, msg.Height-ver-30)
-		m.chooseTracksOptionsList.SetSize(msg.Width-hor, msg.Height-ver-30)
-		m.selectedTracksList.SetSize(msg.Width-hor, msg.Height-ver-30)
+		listWidth := msg.Width - hor
+		listHeight := msg.Height - ver - 30
 
-		// Here again, arbitrary values. Subtracting 40 from the height makes
-		// it look nice in the UI.
-		// FIX: When the window is resize, or the font is changed, the height
-		// of the picker grows super huge (might be an issue with bubble
-		// itself, or I'm not correct).
-		m.filePicker.SetHeight(msg.Height - 40)
+		// Force a minimum size for the list
+		if listWidth < 40 {
+			listWidth = 40
+		}
+		if listHeight < 10 {
+			listHeight = 10
+		}
 
-		m.progress.Width = msg.Width - hor - 40
+		m.initialScreenList.SetSize(listWidth, listHeight)
+		m.chooseTracksOptionsList.SetSize(listWidth, listHeight)
+		m.selectedTracksList.SetSize(listWidth, listHeight)
 
 	case downloadProgressMsg:
 		m.downloadProgress = msg.progress
@@ -207,6 +202,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case downloadCompleteMsg:
 		m.downloadedTracks = msg.tracks
+
+		// When the download completes, by default all tracks
+		// are selected.
+		m.selectedTracks = m.downloadedTracks
 
 		if m.youtubeURL != "" {
 			m.youtubeDownloadPath = msg.path
@@ -354,20 +353,20 @@ func shutdown(d *downloader.Downloader) tea.Cmd {
 func newSelectedTracksList(tracks types.Playlist) list.Model {
 	items := make([]list.Item, len(tracks))
 	for i, track := range tracks {
-		items[i] = item{title: track.Title, desc: track.Path.String()}
+		items[i] = item{title: track.Title, desc: track.Path.String(), selected: true}
 	}
 
-	l := list.New(items, list.NewDefaultDelegate(), 0, 0)
-	// log.Println("inside the newSelectedTracksList", l.Items())
-	l.Title = "randi"
-	// log.Println("title", l.Title)
-	l.SetHeight(20)
+	l := list.New(items, list.NewDefaultDelegate(), 80, 20)
+	l.Title = chooseTracks
+	l.SetFilteringEnabled(true)
+	l.SetShowStatusBar(true)
 	l.AdditionalShortHelpKeys = func() []key.Binding {
 		return []key.Binding{
 			key.NewBinding(key.WithKeys(tea.KeySpace.String()), key.WithHelp("Space", "toggle select")),
 		}
 	}
 
+	// fmt.Printf("DEBUG: Created list with title: '%s' and %d items\n", l.Title, len(l.Items()))
 	return l
 }
 

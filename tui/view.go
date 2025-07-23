@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -66,8 +65,8 @@ func (m model) View() string {
 		body = m.chooseTracksOptionsList.View()
 
 	case screenChooseTracks:
-		log.Println("items len", m.selectedTracksList.Title)
-		log.Println("items", m.selectedTracksList.Items())
+		// log.Println("items title:", m.selectedTracksList.Title)
+		// log.Println("items:", len(m.selectedTracksList.Items()))
 		body = m.selectedTracksList.View()
 
 	case screenDownloadStarting:
