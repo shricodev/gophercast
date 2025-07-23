@@ -145,13 +145,3 @@ func Start() (types.Path, string, string) {
 
 	return mo.dirToMp3Path, mo.youtubePlaylistURL, mo.youtubeURL
 }
-
-type downloadVideoResult struct {
-	track types.Track
-	err   error
-}
-
-type downloadPlaylistResult struct {
-	tracks *types.Playlist
-	err    error
-}

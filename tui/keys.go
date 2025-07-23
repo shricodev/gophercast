@@ -1,0 +1,181 @@
+package tui
+
+import (
+	"os"
+
+	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbletea"
+
+	"github.com/shricodev/gophercast/pkg/types"
+)
+
+func (m *model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	key := msg.String()
+	switch key {
+	case tea.KeyCtrlC.String():
+		return m.handleCtrlCKey()
+
+	case tea.KeyEnter.String():
+		return m.handleEnterKey()
+
+	case tea.KeyEsc.String():
+		return m.handleEscKey()
+
+	case tea.KeySpace.String():
+		return m.handleSpaceKey()
+
+	case "d":
+		return m.handleDKey()
+	}
+
+	return m, nil
+}
+
+func (m *model) handleCtrlCKey() (tea.Model, tea.Cmd) {
+	if m.state == screenDownloadStarting && m.downloader != nil {
+		if !m.isShuttingDown {
+			m.isShuttingDown = true
+			m.shutdownMessage = "Gracefully shutting down... Please wait for the download to finish."
+			return m, shutdown(m.downloader)
+		}
+
+		return m, nil
+	}
+
+	return m, tea.Quit
+}
+
+func (m *model) handleEnterKey() (tea.Model, tea.Cmd) {
+	switch m.state {
+	case screenMenu:
+		return m.handleMenuEnter()
+
+	case screenChooseTracksOptions:
+		return m.handleChooseTracksOptionsEnter()
+
+	case screenPickDir:
+		return m.handlePickDirEnter()
+
+	case screenInputYoutube:
+		return m.handleYouTubeEnter()
+
+	case screenInputYoutubePlaylist:
+		return m.handleYouTubePlaylistEnter()
+
+	case screenChooseTracks:
+		return m.handleChooseTracksEnter()
+	}
+	return m, nil
+}
+
+func (m *model) handleMenuEnter() (tea.Model, tea.Cmd) {
+	selectedItem := m.initialScreenList.SelectedItem().(item)
+	switch selectedItem.title {
+	case directory:
+		m.state = screenPickDir
+		return m, m.filePicker.Init()
+
+	case youtube:
+		m.state = screenInputYoutube
+		m.textInput.Placeholder = "Enter YouTube URL..."
+		m.textInput.Focus()
+		return m, textinput.Blink
+
+	case youtubePlaylist:
+		m.state = screenInputYoutubePlaylist
+		m.textInput.Placeholder = "Enter YouTube playlist URL..."
+		m.textInput.Focus()
+		return m, textinput.Blink
+	}
+	return m, nil
+}
+
+func (m *model) handleChooseTracksOptionsEnter() (tea.Model, tea.Cmd) {
+	selectedItem := m.chooseTracksOptionsList.SelectedItem().(item)
+	switch selectedItem.title {
+	case chooseTracksAuto:
+		m.state = screenStreamTracks
+		return m, nil
+
+	case chooseTracksManually:
+		m.selectedTracks = m.downloadedTracks
+		m.selectedTracksList = newSelectedTracksList(&m.selectedTracks)
+
+		m.state = screenChooseTracks
+		return m, nil
+	}
+	return m, nil
+}
+
+func (m *model) handlePickDirEnter() (tea.Model, tea.Cmd) {
+	selectedPath := m.filePicker.Path
+	if selectedPath != "" {
+		if info, err := os.Stat(selectedPath); err == nil && info.IsDir() {
+			m.dirToMp3Path = types.Path(selectedPath)
+			m.state = screenDownloadStarting
+			return m, m.spinner.Tick
+		}
+	}
+	return m, nil
+}
+
+func (m *model) handleYouTubeEnter() (tea.Model, tea.Cmd) {
+	if m.textInput.Value() != "" {
+		m.youtubeURL = m.textInput.Value()
+		m.state = screenDownloadStarting
+
+		return m, tea.Batch(m.spinner.Tick, downloadYouTubeVideo(m.youtubeURL, m.downloader))
+	}
+	return m, nil
+}
+
+func (m *model) handleYouTubePlaylistEnter() (tea.Model, tea.Cmd) {
+	if m.textInput.Value() != "" {
+		m.youtubePlaylistURL = m.textInput.Value()
+		m.state = screenDownloadStarting
+		return m, tea.Batch(m.spinner.Tick, downloadYouTubePlaylist(m.youtubePlaylistURL, m.downloader))
+	}
+	return m, nil
+}
+
+func (m *model) handleChooseTracksEnter() (tea.Model, tea.Cmd) {
+	m.selectedTracks = m.downloadedTracks
+	return m, nil
+}
+
+func (m *model) handleSpaceKey() (tea.Model, tea.Cmd) {
+	if m.state == screenChooseTracks {
+		if itm, ok := m.selectedTracksList.SelectedItem().(item); ok {
+			newItem := item{
+				title:    itm.title,
+				desc:     itm.desc,
+				selected: !itm.selected,
+			}
+			index := m.selectedTracksList.Index()
+			m.selectedTracksList.SetItem(index, newItem)
+		}
+	}
+	return m, nil
+}
+
+func (m *model) handleDKey() (tea.Model, tea.Cmd) {
+	if m.state == screenPickDir {
+		currentDir := m.filePicker.CurrentDirectory
+		if currentDir != "" {
+			m.dirToMp3Path = types.Path(currentDir)
+			m.state = screenDownloadStarting
+			return m, m.spinner.Tick
+		}
+	}
+
+	return m, nil
+}
+
+func (m *model) handleEscKey() (tea.Model, tea.Cmd) {
+	switch m.state {
+	case screenPickDir, screenInputYoutube, screenInputYoutubePlaylist:
+		m.state = screenMenu
+		return m, nil
+	}
+	return m, nil
+}

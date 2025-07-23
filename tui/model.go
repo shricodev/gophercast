@@ -60,208 +60,42 @@ func (m *model) Init() tea.Cmd {
 
 // Update handles messages and updates the model accordingly.
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		key := msg.String()
+		model, cmd := m.handleKeyMsg(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 
-		switch key {
-		case tea.KeyCtrlC.String():
-			if m.state == screenDownloadStarting && m.downloader != nil {
-				if !m.isShuttingDown {
-					m.isShuttingDown = true
-					m.shutdownMessage = "Gracefully shutting down... Please wait for the download to finish."
-					return m, shutdown(m.downloader)
-				}
-
-				return m, nil
-			}
-
-			return m, tea.Quit
-
-		case tea.KeyEnter.String():
-			switch m.state {
-			case screenMenu:
-				selectedItem := m.initialScreenList.SelectedItem().(item)
-				switch selectedItem.title {
-				case directory:
-					m.state = screenPickDir
-					return m, m.filePicker.Init()
-				case youtube:
-					m.state = screenInputYoutube
-					m.textInput.Placeholder = "Enter YouTube URL..."
-					m.textInput.Focus()
-					return m, textinput.Blink
-				case youtubePlaylist:
-					m.state = screenInputYoutubePlaylist
-					m.textInput.Placeholder = "Enter YouTube playlist URL..."
-					m.textInput.Focus()
-					return m, textinput.Blink
-				}
-
-			case screenChooseTracksOptions:
-				selectedItem := m.chooseTracksOptionsList.SelectedItem().(item)
-				switch selectedItem.title {
-				case chooseTracksAuto:
-					m.state = screenStreamTracks
-					return m, nil
-				case chooseTracksManually:
-					m.selectedTracks = m.downloadedTracks
-					m.selectedTracksList = newSelectedTracksList(&m.selectedTracks)
-
-					m.state = screenChooseTracks
-					return m, nil
-				}
-
-			case screenPickDir:
-				selectedPath := m.filePicker.Path
-				if selectedPath != "" {
-					if info, err := os.Stat(selectedPath); err == nil && info.IsDir() {
-						m.dirToMp3Path = types.Path(selectedPath)
-						m.state = screenDownloadStarting
-						return m, m.spinner.Tick
-					}
-				}
-
-			case screenInputYoutube:
-				if m.textInput.Value() != "" {
-					m.youtubeURL = m.textInput.Value()
-					m.state = screenDownloadStarting
-
-					return m, tea.Batch(m.spinner.Tick, downloadYouTubeVideo(m.youtubeURL, m.downloader))
-				}
-
-			case screenInputYoutubePlaylist:
-				if m.textInput.Value() != "" {
-					m.youtubePlaylistURL = m.textInput.Value()
-					m.state = screenDownloadStarting
-					m.showDownloadProgress = true
-
-					return m, tea.Batch(m.spinner.Tick, downloadYouTubePlaylist(m.youtubePlaylistURL, m.downloader))
-				}
-
-			case screenChooseTracks:
-				m.selectedTracks = m.downloadedTracks
-				return m, nil
-			}
-
-		case tea.KeySpace.String():
-			if m.state == screenChooseTracks {
-				if itm, ok := m.selectedTracksList.SelectedItem().(item); ok {
-					newItem := item{
-						title:    itm.title,
-						desc:     itm.desc,
-						selected: !itm.selected,
-					}
-					index := m.selectedTracksList.Index()
-					m.selectedTracksList.SetItem(index, newItem)
-				}
-			}
-
-		case "d":
-			if m.state == screenPickDir {
-				currentDir := m.filePicker.CurrentDirectory
-				if currentDir != "" {
-					m.dirToMp3Path = types.Path(currentDir)
-					m.state = screenDownloadStarting
-					return m, m.spinner.Tick
-				}
-			}
-
-		case tea.KeyEsc.String():
-			switch m.state {
-			case screenPickDir, screenInputYoutube, screenInputYoutubePlaylist:
-				m.state = screenMenu
-				return m, nil
-			}
+		if model != m {
+			return model, tea.Batch(cmds...)
 		}
 
 	case tea.WindowSizeMsg:
-		hor, ver := docStyle.GetFrameSize()
-
-		listWidth := msg.Width - hor
-		listHeight := msg.Height - ver - 30
-
-		// Force a minimum size for the list
-		if listWidth < 40 {
-			listWidth = 40
-		}
-		if listHeight < 10 {
-			listHeight = 10
+		model, cmd := m.handleWindowSizeMsg(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
 		}
 
-		m.initialScreenList.SetSize(listWidth, listHeight)
-		m.chooseTracksOptionsList.SetSize(listWidth, listHeight)
-		m.selectedTracksList.SetSize(listWidth, listHeight)
-
-	case downloadProgressMsg:
-		m.downloadProgress = msg.progress
-		if m.downloadProgress.Total > 0 {
-			percentage := float64(m.downloadProgress.Completed) / float64(m.downloadProgress.Total)
-			return m, m.progress.SetPercent(percentage)
+		if model != m {
+			return model, tea.Batch(cmds...)
 		}
 
-	case downloadCompleteMsg:
-		m.downloadedTracks = msg.tracks
-
-		// When the download completes, by default all tracks
-		// are selected.
-		m.selectedTracks = m.downloadedTracks
-
-		if m.youtubeURL != "" {
-			m.youtubeDownloadPath = msg.path
-			m.state = screenStreamTracks
-		} else if m.youtubePlaylistURL != "" {
-			m.youtubePlaylistDownloadPath = msg.path
-			m.state = screenChooseTracksOptions
-		} else if m.dirToMp3Path != "" {
-			m.dirToMp3Path = msg.path
-			m.state = screenChooseTracksOptions
+	default:
+		model, cmd := m.handleCustomMessages(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
 		}
 
-		m.showDownloadProgress = false
-
-		if m.downloader != nil {
-			m.downloader.Shutdown()
-			m.downloader = nil
+		if model != m {
+			return model, tea.Batch(cmds...)
 		}
-		return m, nil
-
-	case shutdownCompleteMsg:
-		return m, tea.Quit
-
-	case errMsg:
-		m.err = msg
-		if m.downloader != nil {
-			m.downloader.Shutdown()
-			m.downloader = nil
-		}
-		return m, tea.Quit
 	}
 
-	// Update bubble components
-	var cmd tea.Cmd
-	var cmds []tea.Cmd
-
-	switch m.state {
-	case screenMenu:
-		m.initialScreenList, cmd = m.initialScreenList.Update(msg)
-		cmds = append(cmds, cmd)
-	case screenPickDir:
-		m.filePicker, cmd = m.filePicker.Update(msg)
-		cmds = append(cmds, cmd)
-	case screenInputYoutube, screenInputYoutubePlaylist:
-		m.textInput, cmd = m.textInput.Update(msg)
-		cmds = append(cmds, cmd)
-	case screenDownloadStarting:
-		m.spinner, cmd = m.spinner.Update(msg)
-		cmds = append(cmds, cmd)
-	case screenChooseTracksOptions:
-		m.chooseTracksOptionsList, cmd = m.chooseTracksOptionsList.Update(msg)
-		cmds = append(cmds, cmd)
-	case screenChooseTracks:
-		m.selectedTracksList, cmd = m.selectedTracksList.Update(msg)
-		cmds = append(cmds, cmd)
-	}
+	bubbleCmds := m.updateBubbles(msg)
+	cmds = append(cmds, bubbleCmds...)
 
 	return m, tea.Batch(cmds...)
 }
@@ -395,6 +229,14 @@ type (
 	downloadCompleteMsg struct {
 		tracks types.Playlist
 		path   types.Path
+	}
+	downloadVideoResult struct {
+		track types.Track
+		err   error
+	}
+	downloadPlaylistResult struct {
+		tracks *types.Playlist
+		err    error
 	}
 )
 
