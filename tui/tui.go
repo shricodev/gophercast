@@ -138,7 +138,7 @@ func Start() (types.Path, string, string) {
 		log.Fatal(err)
 	}
 
-	mo := finalModel.(model)
+	mo := finalModel.(*model)
 	if mo.downloader != nil {
 		mo.downloader.Shutdown()
 	}

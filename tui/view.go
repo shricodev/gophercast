@@ -10,7 +10,7 @@ import (
 )
 
 // View renders the TUI.
-func (m model) View() string {
+func (m *model) View() string {
 	if m.err != nil {
 		return docStyle.Render("Error: " + m.err.Error())
 	}

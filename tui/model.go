@@ -54,12 +54,12 @@ type model struct {
 }
 
 // Init initializes the TUI model.
-func (m model) Init() tea.Cmd {
+func (m *model) Init() tea.Cmd {
 	return nil
 }
 
 // Update handles messages and updates the model accordingly.
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		key := msg.String()
@@ -106,7 +106,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				case chooseTracksManually:
 					m.selectedTracks = m.downloadedTracks
-					m.selectedTracksList = newSelectedTracksList(m.selectedTracks)
+					m.selectedTracksList = newSelectedTracksList(&m.selectedTracks)
 
 					m.state = screenChooseTracks
 					return m, nil
@@ -267,7 +267,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // InitialModel returns the initial model for the TUI.
-func InitialModel() model {
+func InitialModel() *model {
 	initialScreenChoices := []list.Item{
 		item{title: directory, desc: "Pick a directory with mp3 files"},
 		item{title: youtube, desc: "Provide a YouTube video URL"},
@@ -322,7 +322,7 @@ func InitialModel() model {
 		panic("failed to initialize logger: " + err.Error())
 	}
 
-	return model{
+	return &model{
 		state: screenMenu,
 
 		initialScreenList:       initialScreenChoicesList,
@@ -350,9 +350,9 @@ func shutdown(d *downloader.Downloader) tea.Cmd {
 	}
 }
 
-func newSelectedTracksList(tracks types.Playlist) list.Model {
-	items := make([]list.Item, len(tracks))
-	for i, track := range tracks {
+func newSelectedTracksList(tracks *types.Playlist) list.Model {
+	items := make([]list.Item, len(*tracks))
+	for i, track := range *tracks {
 		items[i] = item{title: track.Title, desc: track.Path.String(), selected: true}
 	}
 
