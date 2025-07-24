@@ -17,6 +17,8 @@ var (
 	dirToMP3   string
 	ytURL      string
 	ytPlaylist string
+
+	random bool
 )
 
 // serveCmd represents the serve command.
@@ -27,7 +29,15 @@ var serveCmd = &cobra.Command{
 either provide a local mp3 file, a directory with list of mp3 files, or a
 youtube URL or a youtube playlist URL.
 	`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if random && ytURL != "" {
+			return fmt.Errorf("--random cannot be used with -y (YouTube video link)")
+		}
+
+		if random && dirToMP3 == "" && ytPlaylist == "" {
+			return fmt.Errorf("--random must be used with either --dir-to-mp3 or --yt-playlist")
+		}
+
 		switch {
 		case dirToMP3 != "":
 			fmt.Println(dirToMP3)
@@ -38,6 +48,8 @@ youtube URL or a youtube playlist URL.
 		default:
 			_, _, _ = tui.Start()
 		}
+
+		return nil
 	},
 }
 
@@ -56,7 +68,7 @@ func init() {
 	serveCmd.Flags().
 		StringVarP(&ytPlaylist, sourceYoutubePlaylistStr, "p", "", "Link to the youtube playlist")
 
-	serveCmd.Flags().String("random", "", "Select and run the mp3 files in random")
+	serveCmd.Flags().BoolVar(&random, "random", false, "Select and run the mp3 files in random")
 
 	// serveCmd.MarkFlagsOneRequired(sourceLocalDirStr, sourceYoutubeStr, sourceYoutubePlaylistStr)
 	serveCmd.MarkFlagsMutuallyExclusive(
