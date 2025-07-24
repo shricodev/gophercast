@@ -98,8 +98,8 @@ func (m *model) handleChooseTracksOptionsEnter() (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case chooseTracksManually:
-		m.selectedTracks = m.downloadedTracks
-		m.selectedTracksList = newSelectedTracksList(&m.selectedTracks)
+		m.selectedTracks = types.Playlist{}
+		m.selectedTracksList = newSelectedTracksList(&m.downloadedTracks)
 
 		m.state = screenChooseTracks
 		return m, nil
@@ -139,7 +139,20 @@ func (m *model) handleYouTubePlaylistEnter() (tea.Model, tea.Cmd) {
 }
 
 func (m *model) handleChooseTracksEnter() (tea.Model, tea.Cmd) {
-	m.selectedTracks = m.downloadedTracks
+	selectedTracks := types.Playlist{}
+	for i, itm := range m.selectedTracksList.Items() {
+		listItem, ok := itm.(item)
+		if !ok {
+			continue
+		}
+
+		if listItem.selected {
+			selectedTracks = append(selectedTracks, m.downloadedTracks[i])
+		}
+	}
+
+	m.selectedTracks = selectedTracks
+	m.state = screenStreamTracks
 	return m, nil
 }
 

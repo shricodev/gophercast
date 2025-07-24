@@ -6,6 +6,8 @@ func (m *model) handleWindowSizeMsg(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	hor, ver := docStyle.GetFrameSize()
 
 	listWidth := max(msg.Width-hor, 40)
+
+	// -30 is to accomodate the height for the banner.
 	listHeight := max(msg.Height-ver-30, 10)
 
 	m.initialScreenList.SetSize(listWidth, listHeight)

@@ -56,6 +56,8 @@ func init() {
 	serveCmd.Flags().
 		StringVarP(&ytPlaylist, sourceYoutubePlaylistStr, "p", "", "Link to the youtube playlist")
 
+	serveCmd.Flags().String("random", "", "Select and run the mp3 files in random")
+
 	// serveCmd.MarkFlagsOneRequired(sourceLocalDirStr, sourceYoutubeStr, sourceYoutubePlaylistStr)
 	serveCmd.MarkFlagsMutuallyExclusive(
 		sourceLocalDirStr,

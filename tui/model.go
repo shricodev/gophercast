@@ -187,13 +187,16 @@ func shutdown(d *downloader.Downloader) tea.Cmd {
 func newSelectedTracksList(tracks *types.Playlist) list.Model {
 	items := make([]list.Item, len(*tracks))
 	for i, track := range *tracks {
-		items[i] = item{title: track.Title, desc: track.Path.String(), selected: true}
+		items[i] = item{title: track.Title, desc: track.Path.String(), selected: false}
 	}
 
-	l := list.New(items, list.NewDefaultDelegate(), 80, 20)
+	l := list.New(items, itemDelegate{}, 80, 20)
+
 	l.Title = chooseTracks
+
 	l.SetFilteringEnabled(true)
 	l.SetShowStatusBar(true)
+
 	l.AdditionalShortHelpKeys = func() []key.Binding {
 		return []key.Binding{
 			key.NewBinding(key.WithKeys(tea.KeySpace.String()), key.WithHelp("Space", "toggle select")),
