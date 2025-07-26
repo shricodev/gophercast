@@ -31,7 +31,7 @@ youtube URL or a youtube playlist URL.
 	`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if random && ytURL != "" {
-			return fmt.Errorf("--random cannot be used with -y (YouTube video link)")
+			return fmt.Errorf("--random cannot be used with --youtube (YouTube video link)")
 		}
 
 		if random && dirToMP3 == "" && ytPlaylist == "" {

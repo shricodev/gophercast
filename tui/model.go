@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/charmbracelet/bubbles/filepicker"
@@ -64,6 +65,15 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+
+		// We check for 'esc' here because it's a special case. As soon as the
+		// user presses 'esc', we need to return from this entire function, or
+		// else the msg 'esc' is passed to the updateBubbles function below the
+		// switch statement, which eventually closes the running bubble and the
+		// entire application instead of moving the state to the set state.
+		if msg.Type == tea.KeyEsc {
+			return m.handleEscKey()
+		}
 		model, cmd := m.handleKeyMsg(msg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
@@ -153,7 +163,7 @@ func InitialModel() *model {
 		TimeFormat: "15:04:05",
 	})
 	if err != nil {
-		panic("failed to initialize logger: " + err.Error())
+		panic(fmt.Sprintf("failed to initialize logger: %v", err))
 	}
 
 	return &model{
@@ -200,6 +210,7 @@ func newSelectedTracksList(tracks *types.Playlist) list.Model {
 	l.AdditionalShortHelpKeys = func() []key.Binding {
 		return []key.Binding{
 			key.NewBinding(key.WithKeys(tea.KeySpace.String()), key.WithHelp("Space", "toggle select")),
+			key.NewBinding(key.WithKeys(tea.KeyEnter.String()), key.WithHelp("Enter", "confirm selection")),
 		}
 	}
 
