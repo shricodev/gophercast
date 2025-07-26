@@ -38,8 +38,8 @@ type model struct {
 	youtubeDownloadPath         types.Path
 	youtubePlaylistDownloadPath types.Path
 
-	downloadedTracks types.Playlist
-	selectedTracks   types.Playlist
+	downloadedTracks *types.Playlist
+	selectedTracks   *types.Playlist
 
 	downloader       *downloader.Downloader
 	downloadConfig   *downloader.DownloadConfig
