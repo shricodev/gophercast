@@ -9,23 +9,27 @@ import (
 	"github.com/shricodev/gophercast/pkg/types"
 )
 
+const keyD = "d"
+
 func (m *model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	key := msg.String()
-	switch key {
-	case tea.KeyCtrlC.String():
+	switch msg.Type {
+	case tea.KeyCtrlC:
 		return m.handleCtrlCKey()
 
-	case tea.KeyEnter.String():
+	case tea.KeyEnter:
 		return m.handleEnterKey()
 
-	case tea.KeyEsc.String():
+	case tea.KeyEsc:
 		return m.handleEscKey()
 
-	case tea.KeySpace.String():
+	case tea.KeySpace:
 		return m.handleSpaceKey()
 
-	case "d":
-		return m.handleDKey()
+	case tea.KeyRunes:
+		switch msg.String() {
+		case keyD:
+			return m.handleDKey()
+		}
 	}
 
 	return m, nil

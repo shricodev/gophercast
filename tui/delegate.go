@@ -67,4 +67,3 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		_, _ = fmt.Fprintf(w, "%s\n%s", titleLine, descLine)
 	}
 }
-
