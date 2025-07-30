@@ -69,7 +69,7 @@ func downloadYouTubeVideo(url string, d *downloader.Downloader) tea.Cmd {
 					return errMsg{err: result.err}
 				}
 				return downloadCompleteMsg{
-					tracks: types.Playlist{result.track},
+					tracks: &types.Playlist{result.track},
 					path:   result.track.Path,
 				}
 			}
@@ -120,7 +120,7 @@ func downloadYouTubePlaylist(url string, d *downloader.Downloader) tea.Cmd {
 
 				// log.Printf("Download complete: %v", tracks)
 				return downloadCompleteMsg{
-					tracks: tracks,
+					tracks: &tracks,
 					path:   dirPath,
 				}
 			}

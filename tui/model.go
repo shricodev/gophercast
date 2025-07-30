@@ -241,7 +241,7 @@ type (
 		progress *downloader.DownloadProgress
 	}
 	downloadCompleteMsg struct {
-		tracks types.Playlist
+		tracks *types.Playlist
 		path   types.Path
 	}
 	downloadVideoResult struct {

@@ -27,7 +27,7 @@ func (m *model) handleDownloadProgress(msg downloadProgressMsg) (tea.Model, tea.
 }
 
 func (m *model) handleDownloadComplete(msg downloadCompleteMsg) (tea.Model, tea.Cmd) {
-	m.downloadedTracks = &msg.tracks
+	m.downloadedTracks = msg.tracks
 
 	// When the download completes, by default all tracks
 	// are selected.
