@@ -40,7 +40,7 @@ func (m *model) handleCtrlCKey() (tea.Model, tea.Cmd) {
 		if !m.isShuttingDown {
 			m.isShuttingDown = true
 			m.shutdownMessage = "Gracefully shutting down... Please wait for the download to finish."
-			return m, shutdown(m.downloader)
+			return m, shutdown()
 		}
 
 		return m, nil

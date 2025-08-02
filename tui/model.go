@@ -16,6 +16,7 @@ import (
 	"github.com/shricodev/gophercast/internal/downloader"
 	"github.com/shricodev/gophercast/internal/logger"
 	"github.com/shricodev/gophercast/pkg/types"
+	"github.com/shricodev/gophercast/server"
 )
 
 // model represents the state of the TUI.
@@ -48,6 +49,10 @@ type model struct {
 	isShuttingDown       bool
 	shutdownMessage      string
 	showDownloadProgress bool
+
+	audioServer *server.AudioServer
+	serverPort  int
+	serverError error
 
 	logger *logger.Logger
 
@@ -182,15 +187,16 @@ func InitialModel() *model {
 		downloader:       d,
 		downloadProgress: &downloader.DownloadProgress{},
 
+		// this might change depending on if it is available or not
+		serverPort: 8080,
+
 		logger: logger,
 	}
 }
 
-// shutdown gracefully shuts down the downloader.
-func shutdown(d *downloader.Downloader) tea.Cmd {
+func shutdown() tea.Cmd {
 	return func() tea.Msg {
-		d.Shutdown()
-		return shutdownCompleteMsg{}
+		return shutdownInitiatedMsg{}
 	}
 }
 
@@ -236,7 +242,6 @@ func (i item) Description() string { return i.desc }
 func (i item) FilterValue() string { return i.title }
 
 type (
-	shutdownCompleteMsg struct{}
 	downloadProgressMsg struct {
 		progress *downloader.DownloadProgress
 	}
@@ -251,6 +256,19 @@ type (
 	downloadPlaylistResult struct {
 		tracks *types.Playlist
 		err    error
+	}
+	shutdownInitiatedMsg struct{}
+	serverErrorMsg       struct {
+		err error
+	}
+	serverStartedMsg struct {
+		port int
+	}
+	clientConnectedMsg struct {
+		port int
+	}
+	trackChangedMsg struct {
+		track types.Track
 	}
 )
 
