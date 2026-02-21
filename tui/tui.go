@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	singleFile      = "Single File"
 	directory       = "Directory"
 	youtube         = "YouTube"
 	youtubePlaylist = "YouTube Playlist"

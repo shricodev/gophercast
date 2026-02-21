@@ -109,6 +109,16 @@ func (m *model) handleServerError(msg serverErrorMsg) (tea.Model, tea.Cmd) {
 
 func (m *model) handleClientListUpdate(msg clientListUpdateMsg) (tea.Model, tea.Cmd) {
 	m.connectedClients = msg.clients
+
+	// Auto-shutdown: all clients disconnected during playback
+	if m.state == screenStreamTracks && len(m.connectedClients) == 0 {
+		if m.audioServer != nil {
+			m.audioServer.Stop()
+			m.audioServer = nil
+		}
+		return m, tea.Quit
+	}
+
 	return m, m.listenForClientUpdates()
 }
 

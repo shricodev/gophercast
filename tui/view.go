@@ -36,11 +36,17 @@ func (m *model) View() string {
 		body = m.initialScreenList.View()
 
 	case screenPickDir:
+		label := "Choose a directory:"
+		help := "↑/↓ j/k: Navigate, Enter: Select, d: Select cwd, Esc: Back"
+		if m.pickMode == "file" {
+			label = "Choose an audio file:"
+			help = "↑/↓ j/k: Navigate, Enter: Select, Esc: Back"
+		}
 		body = lipgloss.JoinVertical(lipgloss.Left,
-			"Choose a directory:",
+			label,
 			"",
 			m.filePicker.View(),
-			helpStyle.Render("↑/↓ j/k: Navigate, Enter: Select, d: Select cwd, Esc: Back"),
+			helpStyle.Render(help),
 		)
 
 	case screenInputYoutube:

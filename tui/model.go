@@ -29,7 +29,8 @@ const headerHeight = 10
 
 // model represents the state of the TUI.
 type model struct {
-	state screen
+	state    screen
+	pickMode string // "dir" or "file"
 
 	windowWidth  int
 	windowHeight int
@@ -134,6 +135,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // InitialModel returns the initial model for the TUI.
 func InitialModel() *model {
 	initialScreenChoices := []list.Item{
+		item{title: singleFile, desc: "Pick a single mp3 audio file"},
 		item{title: directory, desc: "Pick a directory with mp3 files"},
 		item{title: youtube, desc: "Provide a YouTube video URL"},
 		item{title: youtubePlaylist, desc: "Provide a YouTube playlist URL"},

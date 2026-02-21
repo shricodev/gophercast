@@ -2,6 +2,8 @@ package tui
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbletea"
@@ -86,7 +88,19 @@ func (m *model) handleEnterKey() (tea.Model, tea.Cmd) {
 func (m *model) handleMenuEnter() (tea.Model, tea.Cmd) {
 	selectedItem := m.initialScreenList.SelectedItem().(item)
 	switch selectedItem.title {
+	case singleFile:
+		m.pickMode = "file"
+		m.filePicker.FileAllowed = true
+		m.filePicker.DirAllowed = false
+		m.filePicker.AllowedTypes = []string{".mp3"}
+		m.state = screenPickDir
+		return m, m.filePicker.Init()
+
 	case directory:
+		m.pickMode = "dir"
+		m.filePicker.DirAllowed = true
+		m.filePicker.FileAllowed = false
+		m.filePicker.AllowedTypes = nil
 		m.state = screenPickDir
 		return m, m.filePicker.Init()
 
@@ -124,17 +138,41 @@ func (m *model) handleChooseTracksOptionsEnter() (tea.Model, tea.Cmd) {
 
 func (m *model) handlePickDirEnter() (tea.Model, tea.Cmd) {
 	selectedPath := m.filePicker.Path
-	if selectedPath != "" {
-		if info, err := os.Stat(selectedPath); err == nil && info.IsDir() {
-			m.dirToMp3Path = types.Path(selectedPath)
-			m.state = screenDownloadStarting
-			return m, tea.Batch(
-				m.spinner.Tick,
-				buildPlaylistFromDir(m.dirToMp3Path, m.downloadEvents),
-				listenForDownloadEvents(m.downloadEvents),
-			)
-		}
+	if selectedPath == "" {
+		return m, nil
 	}
+
+	info, err := os.Stat(selectedPath)
+	if err != nil {
+		return m, nil
+	}
+
+	// Single file mode: create a one-track playlist and go straight to lobby
+	if m.pickMode == "file" && !info.IsDir() {
+		title := strings.TrimSuffix(filepath.Base(selectedPath), filepath.Ext(selectedPath))
+		track := types.Track{
+			Title:  title,
+			Path:   types.Path(selectedPath),
+			Source: types.SourceLocalFile,
+		}
+		playlist := types.Playlist{track}
+		m.downloadedTracks = &playlist
+		m.selectedTracks = &playlist
+		m.state = screenLobby
+		return m, tea.Batch(m.spinner.Tick, m.startAudioServer())
+	}
+
+	// Directory mode
+	if info.IsDir() {
+		m.dirToMp3Path = types.Path(selectedPath)
+		m.state = screenDownloadStarting
+		return m, tea.Batch(
+			m.spinner.Tick,
+			buildPlaylistFromDir(m.dirToMp3Path, m.downloadEvents),
+			listenForDownloadEvents(m.downloadEvents),
+		)
+	}
+
 	return m, nil
 }
 
@@ -205,7 +243,7 @@ func (m *model) handleSpaceKey() (tea.Model, tea.Cmd) {
 }
 
 func (m *model) handleDKey() (tea.Model, tea.Cmd) {
-	if m.state == screenPickDir {
+	if m.state == screenPickDir && m.pickMode != "file" {
 		currentDir := m.filePicker.CurrentDirectory
 		if currentDir != "" {
 			m.dirToMp3Path = types.Path(currentDir)
