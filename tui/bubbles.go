@@ -18,6 +18,13 @@ func (m *model) updateBubbles(msg tea.Msg) []tea.Cmd {
 		m.filePicker, cmd = m.filePicker.Update(msg)
 		cmds = append(cmds, cmd)
 
+		// Single file mode: detect selection after the filepicker processes the key
+		if m.pickMode == "file" {
+			if didSelect, path := m.filePicker.DidSelectFile(msg); didSelect {
+				cmds = append(cmds, m.handleFileSelected(path))
+			}
+		}
+
 	case screenInputYoutube, screenInputYoutubePlaylist:
 		m.textInput, cmd = m.textInput.Update(msg)
 		cmds = append(cmds, cmd)

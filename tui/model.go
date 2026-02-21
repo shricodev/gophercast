@@ -294,9 +294,10 @@ type (
 	clientListUpdateMsg struct {
 		clients []protocol.ClientInfo
 	}
-	playbackStartedMsg struct{}
-	playbackStoppedMsg struct{ reason string }
-	streamTickMsg      struct {
+	playbackStartedMsg       struct{}
+	playbackStoppedMsg       struct{ reason string }
+	allClientsDisconnectedMsg struct{}
+	streamTickMsg            struct {
 		elapsed time.Duration
 		track   string
 	}

@@ -172,12 +172,10 @@ func (c *AudioClient) handleControl(data []byte) error {
 }
 
 // handleStartPlayback initializes the audio sink and schedules playback.
+// Sink init runs in a goroutine so it doesn't block the read loop — oto
+// context creation can be slow on some platforms (especially Windows).
 func (c *AudioClient) handleStartPlayback(msg protocol.StartPlaybackMsg) error {
 	fmt.Printf("Now playing: %s\n", msg.TrackTitle)
-
-	if err := c.sink.Init(msg.SampleRate, msg.Channels); err != nil {
-		return fmt.Errorf("init audio sink: %w", err)
-	}
 
 	c.startAtNs = msg.StartAtNs
 	c.nextSeq = 0
@@ -186,7 +184,13 @@ func (c *AudioClient) handleStartPlayback(msg protocol.StartPlaybackMsg) error {
 	c.buffer = nil
 	c.bufferMu.Unlock()
 
-	go c.waitAndPlay()
+	go func() {
+		if err := c.sink.Init(msg.SampleRate, msg.Channels); err != nil {
+			fmt.Printf("Error initializing audio: %v\n", err)
+			return
+		}
+		c.waitAndPlay()
+	}()
 	return nil
 }
 
@@ -202,11 +206,13 @@ func (c *AudioClient) handleTrackChange(msg protocol.TrackChangeMsg) error {
 	c.buffer = nil
 	c.bufferMu.Unlock()
 
-	if err := c.sink.Init(msg.SampleRate, msg.Channels); err != nil {
-		return fmt.Errorf("re-init audio sink: %w", err)
-	}
-
-	go c.waitAndPlay()
+	go func() {
+		if err := c.sink.Init(msg.SampleRate, msg.Channels); err != nil {
+			fmt.Printf("Error re-initializing audio: %v\n", err)
+			return
+		}
+		c.waitAndPlay()
+	}()
 	return nil
 }
 

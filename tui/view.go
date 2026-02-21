@@ -37,16 +37,13 @@ func (m *model) View() string {
 
 	case screenPickDir:
 		label := "Choose a directory:"
-		help := "↑/↓ j/k: Navigate, Enter: Select, d: Select cwd, Esc: Back"
 		if m.pickMode == "file" {
 			label = "Choose an audio file:"
-			help = "↑/↓ j/k: Navigate, Enter: Select, Esc: Back"
 		}
 		body = lipgloss.JoinVertical(lipgloss.Left,
 			label,
 			"",
 			m.filePicker.View(),
-			helpStyle.Render(help),
 		)
 
 	case screenInputYoutube:
@@ -205,7 +202,19 @@ func (m *model) View() string {
 		minutes := int(m.streamElapsed.Minutes())
 		seconds := int(m.streamElapsed.Seconds()) % 60
 		components = append(components, fmt.Sprintf("Elapsed: %d:%02d", minutes, seconds))
-		components = append(components, fmt.Sprintf("Clients: %d connected", len(m.connectedClients)))
+
+		components = append(components, "")
+		components = append(components, fmt.Sprintf("Connected clients (%d):", len(m.connectedClients)))
+		for i, c := range m.connectedClients {
+			name := c.Name
+			if name == "" {
+				name = "(unnamed)"
+			}
+			components = append(components, fmt.Sprintf("  %d. %s - %s", i+1, name, c.Addr))
+		}
+		if len(m.connectedClients) == 0 {
+			components = append(components, "  (none)")
+		}
 
 		components = append(components, "")
 		components = append(components, helpStyle.Render("Ctrl+C: Stop and exit"))

@@ -137,6 +137,11 @@ func (m *model) handleChooseTracksOptionsEnter() (tea.Model, tea.Cmd) {
 }
 
 func (m *model) handlePickDirEnter() (tea.Model, tea.Cmd) {
+	// Single file mode is handled in updateBubbles via DidSelectFile
+	if m.pickMode == "file" {
+		return m, nil
+	}
+
 	selectedPath := m.filePicker.Path
 	if selectedPath == "" {
 		return m, nil
@@ -147,22 +152,6 @@ func (m *model) handlePickDirEnter() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Single file mode: create a one-track playlist and go straight to lobby
-	if m.pickMode == "file" && !info.IsDir() {
-		title := strings.TrimSuffix(filepath.Base(selectedPath), filepath.Ext(selectedPath))
-		track := types.Track{
-			Title:  title,
-			Path:   types.Path(selectedPath),
-			Source: types.SourceLocalFile,
-		}
-		playlist := types.Playlist{track}
-		m.downloadedTracks = &playlist
-		m.selectedTracks = &playlist
-		m.state = screenLobby
-		return m, tea.Batch(m.spinner.Tick, m.startAudioServer())
-	}
-
-	// Directory mode
 	if info.IsDir() {
 		m.dirToMp3Path = types.Path(selectedPath)
 		m.state = screenDownloadStarting
@@ -174,6 +163,23 @@ func (m *model) handlePickDirEnter() (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// handleFileSelected is called from updateBubbles after the filepicker
+// confirms a file selection. It creates a single-track playlist and
+// transitions straight to the lobby.
+func (m *model) handleFileSelected(path string) tea.Cmd {
+	title := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	track := types.Track{
+		Title:  title,
+		Path:   types.Path(path),
+		Source: types.SourceLocalFile,
+	}
+	playlist := types.Playlist{track}
+	m.downloadedTracks = &playlist
+	m.selectedTracks = &playlist
+	m.state = screenLobby
+	return tea.Batch(m.spinner.Tick, m.startAudioServer())
 }
 
 func (m *model) handleYouTubeEnter() (tea.Model, tea.Cmd) {
