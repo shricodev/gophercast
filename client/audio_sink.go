@@ -9,11 +9,10 @@ import (
 
 // SystemAudioSink plays PCM audio through the system audio output using oto.
 type SystemAudioSink struct {
-	otoCtx    *oto.Context
-	player    *oto.Player
-	pipeR     *io.PipeReader
-	pipeW     *io.PipeWriter
-	initiated bool
+	otoCtx *oto.Context
+	player *oto.Player
+	pipeR  *io.PipeReader
+	pipeW  *io.PipeWriter
 }
 
 // NewSystemAudioSink creates a new SystemAudioSink.
@@ -21,29 +20,30 @@ func NewSystemAudioSink() *SystemAudioSink {
 	return &SystemAudioSink{}
 }
 
-// Init initializes the audio context and player for the given sample rate and channels.
+// Init initializes the audio context (once) and creates a new player.
 func (s *SystemAudioSink) Init(sampleRate, channels int) error {
-	if s.initiated {
-		s.Close()
+	// Close previous player/pipe if any
+	s.closePlayer()
+
+	// Create the oto context only once — it cannot be recreated
+	if s.otoCtx == nil {
+		op := &oto.NewContextOptions{
+			SampleRate:   sampleRate,
+			ChannelCount: channels,
+			Format:       oto.FormatSignedInt16LE,
+		}
+
+		otoCtx, readyChan, err := oto.NewContext(op)
+		if err != nil {
+			return fmt.Errorf("create oto context: %w", err)
+		}
+		<-readyChan
+		s.otoCtx = otoCtx
 	}
 
-	op := &oto.NewContextOptions{
-		SampleRate:   sampleRate,
-		ChannelCount: channels,
-		Format:       oto.FormatSignedInt16LE,
-	}
-
-	otoCtx, readyChan, err := oto.NewContext(op)
-	if err != nil {
-		return fmt.Errorf("create oto context: %w", err)
-	}
-	<-readyChan
-
-	s.otoCtx = otoCtx
 	s.pipeR, s.pipeW = io.Pipe()
-	s.player = otoCtx.NewPlayer(s.pipeR)
+	s.player = s.otoCtx.NewPlayer(s.pipeR)
 	s.player.Play()
-	s.initiated = true
 
 	return nil
 }
@@ -56,17 +56,24 @@ func (s *SystemAudioSink) Write(p []byte) (int, error) {
 	return s.pipeW.Write(p)
 }
 
-// Close stops playback and releases resources.
-func (s *SystemAudioSink) Close() error {
+// closePlayer stops the current player and pipe without destroying the context.
+func (s *SystemAudioSink) closePlayer() {
 	if s.pipeW != nil {
 		s.pipeW.Close()
+		s.pipeW = nil
 	}
 	if s.player != nil {
 		s.player.Close()
+		s.player = nil
 	}
 	if s.pipeR != nil {
 		s.pipeR.Close()
+		s.pipeR = nil
 	}
-	s.initiated = false
+}
+
+// Close stops playback and releases resources.
+func (s *SystemAudioSink) Close() error {
+	s.closePlayer()
 	return nil
 }

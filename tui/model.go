@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/charmbracelet/bubbles/filepicker"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/shricodev/gophercast/internal/downloader"
 	"github.com/shricodev/gophercast/internal/logger"
+	"github.com/shricodev/gophercast/internal/utils"
 	"github.com/shricodev/gophercast/pkg/protocol"
 	"github.com/shricodev/gophercast/pkg/types"
 	"github.com/shricodev/gophercast/server"
@@ -151,10 +153,11 @@ func InitialModel() *model {
 	// ~/.gophercast/downloads directory.
 	fp.ShowHidden = true
 
-	homeDir, err := os.UserHomeDir()
-	if err == nil {
-		fp.CurrentDirectory = homeDir
+	homeDir, _ := os.UserHomeDir()
+	if homeDir == "" {
+		homeDir = os.TempDir()
 	}
+	fp.CurrentDirectory = homeDir
 
 	ti := textinput.New()
 	ti.CharLimit = 500
@@ -169,9 +172,14 @@ func InitialModel() *model {
 	downloadConfig := downloader.DefaultConfig()
 	d := downloader.NewDownloader(downloadConfig)
 
+	logDir := types.Path(filepath.Join(homeDir, ".gophercast", "logs"))
+	if err := utils.EnsureDir(logDir); err != nil {
+		panic(fmt.Sprintf("failed to create log directory: %v", err))
+	}
+
 	logger, err := logger.New(logger.Config{
 		Level:      logger.LevelInfo,
-		Output:     "stdout",
+		Output:     logDir.String(),
 		TimeFormat: "15:04:05",
 	})
 	if err != nil {
