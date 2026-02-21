@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/shricodev/gophercast/internal/downloader"
+	"github.com/shricodev/gophercast/internal/playlist"
 	"github.com/shricodev/gophercast/pkg/types"
 )
 
@@ -31,6 +32,7 @@ const (
 	screenDownloadStarting
 	screenChooseTracksOptions
 	screenChooseTracks
+	screenLobby
 	screenStreamTracks
 )
 
@@ -39,92 +41,96 @@ var (
 	helpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Padding(1, 0)
 )
 
-// downloadYouTubeVideo downloads a YouTube video and returns a message.
-func downloadYouTubeVideo(url string, d *downloader.Downloader) tea.Cmd {
+// downloadYouTubeVideo starts a YouTube video download using the channel pattern.
+func downloadYouTubeVideo(url string, d *downloader.Downloader, events chan tea.Msg) tea.Cmd {
 	return func() tea.Msg {
-		progressChan := make(chan downloader.DownloadProgress, 1)
 		d.SetProgressCallback(func(progress downloader.DownloadProgress) {
 			select {
-			case progressChan <- progress:
+			case events <- downloadProgressMsg{progress: &progress}:
 			default:
 			}
 		})
 
-		resultChan := make(chan downloadVideoResult, 1)
 		go func() {
 			track, err := d.DownloadVideo(url)
-			resultChan <- downloadVideoResult{
-				track: track,
-				err:   err,
+			if err != nil {
+				events <- errMsg{err: err}
+				return
+			}
+			events <- downloadCompleteMsg{
+				tracks: &types.Playlist{track},
+				path:   track.Path,
 			}
 		}()
 
-		for {
-			select {
-			case progress := <-progressChan:
-				_ = progress
-				// log.Printf("Downloading: %s", progress.Current)
-			case result := <-resultChan:
-				if result.err != nil {
-					return errMsg{err: result.err}
-				}
-				return downloadCompleteMsg{
-					tracks: &types.Playlist{result.track},
-					path:   result.track.Path,
-				}
-			}
-		}
+		return nil
 	}
 }
 
-// downloadYouTubePlaylist downloads a YouTube playlist and returns a message.
-func downloadYouTubePlaylist(url string, d *downloader.Downloader) tea.Cmd {
+// downloadYouTubePlaylist starts a YouTube playlist download using the channel pattern.
+func downloadYouTubePlaylist(url string, d *downloader.Downloader, events chan tea.Msg) tea.Cmd {
 	return func() tea.Msg {
-		progressChan := make(chan downloader.DownloadProgress, 1)
 		d.SetProgressCallback(func(progress downloader.DownloadProgress) {
 			select {
-			case progressChan <- progress:
+			case events <- downloadProgressMsg{progress: &progress}:
 			default:
 			}
 		})
 
-		resultChan := make(chan downloadPlaylistResult, 1)
 		go func() {
 			tracks, err := d.DownloadPlaylist(url)
-			resultChan <- downloadPlaylistResult{
-				tracks: tracks,
-				err:    err,
+			if err != nil {
+				events <- errMsg{err: err}
+				return
+			}
+
+			var dirPath types.Path
+			var trackList types.Playlist
+			if tracks != nil {
+				trackList = *tracks
+				if trackList.Len() > 0 {
+					audioPath := trackList[0].Path
+					dirPath = types.Path(filepath.Dir(audioPath.String()))
+				}
+			}
+
+			events <- downloadCompleteMsg{
+				tracks: &trackList,
+				path:   dirPath,
 			}
 		}()
 
-		for {
-			select {
-			case progress := <-progressChan:
-				_ = progress
-			// log.Println(progress)
+		return nil
+	}
+}
 
-			case result := <-resultChan:
-				if result.err != nil {
-					return errMsg{result.err}
-				}
-
-				var dirPath types.Path
-				var tracks types.Playlist
-				if result.tracks != nil {
-					tracks = *result.tracks
-					if tracks.Len() > 0 {
-						audioPath := tracks[0].Path
-						dirPath = types.Path(filepath.Dir(audioPath.String()))
-					}
-				}
-
-				// log.Printf("Download complete: %v", tracks)
-				return downloadCompleteMsg{
-					tracks: &tracks,
-					path:   dirPath,
-				}
+// buildPlaylistFromDir scans a directory for MP3 files in the background.
+func buildPlaylistFromDir(dirPath types.Path, events chan tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		go func() {
+			tracks, err := playlist.BuildPlaylistFromDir(dirPath)
+			if err != nil {
+				events <- errMsg{err: err}
+				return
 			}
+			events <- downloadCompleteMsg{
+				tracks: tracks,
+				path:   dirPath,
+			}
+		}()
+
+		return nil
+	}
+}
+
+// listenForDownloadEvents blocks on the events channel and returns messages.
+func listenForDownloadEvents(events chan tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		msg, ok := <-events
+		if !ok {
+			return nil
 		}
+		return msg
 	}
 }
 

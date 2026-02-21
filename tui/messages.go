@@ -19,10 +19,14 @@ func (m *model) handleCustomMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleServerStarted(msg)
 	case serverErrorMsg:
 		return m.handleServerError(msg)
-	case clientConnectedMsg:
-		return m.handleClientConnected(msg)
-	case trackChangedMsg:
-		return m.handleTrackChanged(msg)
+	case clientListUpdateMsg:
+		return m.handleClientListUpdate(msg)
+	case playbackStartedMsg:
+		return m.handlePlaybackStarted()
+	case playbackStoppedMsg:
+		return m.handlePlaybackStopped(msg)
+	case streamTickMsg:
+		return m.handleStreamTick(msg)
 	case errMsg:
 		return m.handleError(msg)
 	}
@@ -32,11 +36,12 @@ func (m *model) handleCustomMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *model) handleDownloadProgress(msg downloadProgressMsg) (tea.Model, tea.Cmd) {
 	m.downloadProgress = msg.progress
+	cmds := []tea.Cmd{listenForDownloadEvents(m.downloadEvents)}
 	if m.downloadProgress.Total > 0 {
 		percentage := float64(m.downloadProgress.Completed) / float64(m.downloadProgress.Total)
-		return m, m.progress.SetPercent(percentage)
+		cmds = append(cmds, m.progress.SetPercent(percentage))
 	}
-	return m, nil
+	return m, tea.Batch(cmds...)
 }
 
 func (m *model) handleDownloadComplete(msg downloadCompleteMsg) (tea.Model, tea.Cmd) {
@@ -48,8 +53,8 @@ func (m *model) handleDownloadComplete(msg downloadCompleteMsg) (tea.Model, tea.
 
 	if m.youtubeURL != "" {
 		m.youtubeDownloadPath = msg.path
-		m.state = screenStreamTracks
-		return m, m.startAudioServer()
+		m.state = screenLobby
+		return m, tea.Batch(m.spinner.Tick, m.startAudioServer())
 	} else if m.youtubePlaylistURL != "" {
 		m.youtubePlaylistDownloadPath = msg.path
 		m.state = screenChooseTracksOptions
@@ -74,7 +79,7 @@ func (m *model) handleShutdownInitiated() (tea.Model, tea.Cmd) {
 	}
 
 	if m.audioServer != nil {
-		// m.audioServer.Stop()
+		m.audioServer.Stop()
 		m.audioServer = nil
 	}
 
@@ -92,48 +97,60 @@ func (m *model) handleError(msg errMsg) (tea.Model, tea.Cmd) {
 
 func (m *model) handleServerStarted(msg serverStartedMsg) (tea.Model, tea.Cmd) {
 	m.serverPort = msg.port
-	m.logger.Logger.Info("server started on port %d", m.serverPort)
-
-	m.printNetworkInfo()
-
-	return m, nil
+	m.logger.ServerStarted(m.serverPort)
+	return m, m.listenForClientUpdates()
 }
 
 func (m *model) handleServerError(msg serverErrorMsg) (tea.Model, tea.Cmd) {
 	m.serverError = msg.err
-	m.logger.Logger.Error("server error: %v", m.serverError)
+	m.logger.Error("server error", "error", m.serverError)
 	return m, nil
 }
 
-func (m *model) printNetworkInfo() {
-	fmt.Println("\n=== GopherCast Server Started ===")
-	fmt.Printf("Server running on port: %d\n", m.serverPort)
+func (m *model) handleClientListUpdate(msg clientListUpdateMsg) (tea.Model, tea.Cmd) {
+	m.connectedClients = msg.clients
+	return m, m.listenForClientUpdates()
+}
 
-	addrs, err := net.InterfaceAddrs()
+func (m *model) handlePlaybackStarted() (tea.Model, tea.Cmd) {
+	m.state = screenStreamTracks
+	return m, m.listenForStreamEvents()
+}
+
+func (m *model) handlePlaybackStopped(msg playbackStoppedMsg) (tea.Model, tea.Cmd) {
+	m.currentTrackTitle = ""
+	m.streamElapsed = 0
+	return m, nil
+}
+
+func (m *model) handleStreamTick(msg streamTickMsg) (tea.Model, tea.Cmd) {
+	m.streamElapsed = msg.elapsed
+	m.currentTrackTitle = msg.track
+	if m.audioServer != nil && m.state == screenStreamTracks {
+		return m, m.listenForStreamEvents()
+	}
+	return m, nil
+}
+
+// getServerAddresses returns the LAN addresses the server is reachable at.
+func (m *model) getServerAddresses() []string {
+	var addrs []string
+	ifaces, err := net.InterfaceAddrs()
 	if err != nil {
-		m.logger.Logger.Info("error getting network interfaces: %v", err)
-		return
+		return []string{fmt.Sprintf("ws://localhost:%d/ws", m.serverPort)}
 	}
 
-	fmt.Println("\nClients can connect to:")
-	for _, addrs := range addrs {
-		if ipnet, ok := addrs.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+	for _, addr := range ifaces {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To4() != nil {
-				fmt.Printf("  http://%s:%d\n", ipnet.IP.String(), m.serverPort)
-				fmt.Printf("  ws://%s:%d/ws\n", ipnet.IP.String(), m.serverPort)
+				addrs = append(addrs, fmt.Sprintf("ws://%s:%d/ws", ipnet.IP.String(), m.serverPort))
 			}
 		}
 	}
 
-	fmt.Printf("  http://localhost:%d (local only)\n", m.serverPort)
-	fmt.Printf("  http://127.0.0.1:%d (local only)\n", m.serverPort)
-	fmt.Println("\n================================")
-}
+	if len(addrs) == 0 {
+		addrs = append(addrs, fmt.Sprintf("ws://localhost:%d/ws", m.serverPort))
+	}
 
-func (m *model) handleClientConnected(msg clientConnectedMsg) (tea.Model, tea.Cmd) {
-	return m, nil
-}
-
-func (m *model) handleTrackChanged(msg trackChangedMsg) (tea.Model, tea.Cmd) {
-	return m, nil
+	return addrs
 }

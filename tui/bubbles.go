@@ -19,7 +19,7 @@ func (m *model) updateBubbles(msg tea.Msg) []tea.Cmd {
 		m.textInput, cmd = m.textInput.Update(msg)
 		cmds = append(cmds, cmd)
 
-	case screenDownloadStarting:
+	case screenDownloadStarting, screenLobby:
 		m.spinner, cmd = m.spinner.Update(msg)
 		cmds = append(cmds, cmd)
 

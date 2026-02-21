@@ -147,25 +147,62 @@ func (m *model) View() string {
 
 		body = lipgloss.JoinVertical(lipgloss.Left, components...)
 
-	case screenStreamTracks:
+	case screenLobby:
 		var components []string
 
-		components = append(components, "Server running!")
+		components = append(components, m.spinner.View()+" Lobby - Waiting for clients")
 
-		if m.downloadedTracks.Len() > 0 {
+		addrs := m.getServerAddresses()
+		if len(addrs) > 0 {
 			components = append(components, "")
-			components = append(
-				components,
-				fmt.Sprintf("Downloaded %d tracks successfully!", m.downloadedTracks.Len()),
-			)
+			components = append(components, fmt.Sprintf("Server: %s", addrs[0]))
+		}
 
-			if m.dirToMp3Path != "" {
-				components = append(components, fmt.Sprintf("Location: %s", m.dirToMp3Path))
+		trackCount := 0
+		if m.selectedTracks != nil {
+			trackCount = m.selectedTracks.Len()
+		}
+		components = append(components, fmt.Sprintf("Tracks: %d selected", trackCount))
+
+		components = append(components, "")
+		components = append(components, fmt.Sprintf("Connected clients (%d):", len(m.connectedClients)))
+		for i, c := range m.connectedClients {
+			name := c.Name
+			if name == "" {
+				name = "(unnamed)"
 			}
+			components = append(components, fmt.Sprintf("  %d. %s - %s", i+1, name, c.Addr))
+		}
+
+		if len(m.connectedClients) == 0 {
+			components = append(components, "  (none)")
 		}
 
 		components = append(components, "")
-		components = append(components, helpStyle.Render("Press Ctrl + C to exit"))
+		if len(m.connectedClients) > 0 {
+			components = append(components, helpStyle.Render("Enter: Start playback | Esc: Back | Ctrl+C: Quit"))
+		} else {
+			components = append(components, helpStyle.Render("Waiting for clients to connect... | Esc: Back | Ctrl+C: Quit"))
+		}
+
+		body = lipgloss.JoinVertical(lipgloss.Left, components...)
+
+	case screenStreamTracks:
+		var components []string
+
+		if m.currentTrackTitle != "" {
+			components = append(components, fmt.Sprintf("Now Playing: %s", m.currentTrackTitle))
+		} else {
+			components = append(components, "Streaming...")
+		}
+
+		minutes := int(m.streamElapsed.Minutes())
+		seconds := int(m.streamElapsed.Seconds()) % 60
+		components = append(components, fmt.Sprintf("Elapsed: %d:%02d", minutes, seconds))
+		components = append(components, fmt.Sprintf("Clients: %d connected", len(m.connectedClients)))
+
+		components = append(components, "")
+		components = append(components, helpStyle.Render("Ctrl+C: Stop and exit"))
 
 		body = lipgloss.JoinVertical(lipgloss.Left, components...)
 	}

@@ -46,6 +46,14 @@ func (m *model) handleCtrlCKey() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	if m.state == screenLobby || m.state == screenStreamTracks {
+		if m.audioServer != nil {
+			m.audioServer.Stop()
+			m.audioServer = nil
+		}
+		return m, tea.Quit
+	}
+
 	return m, tea.Quit
 }
 
@@ -68,6 +76,9 @@ func (m *model) handleEnterKey() (tea.Model, tea.Cmd) {
 
 	case screenChooseTracks:
 		return m.handleChooseTracksEnter()
+
+	case screenLobby:
+		return m.handleLobbyEnter()
 	}
 	return m, nil
 }
@@ -98,8 +109,8 @@ func (m *model) handleChooseTracksOptionsEnter() (tea.Model, tea.Cmd) {
 	selectedItem := m.chooseTracksOptionsList.SelectedItem().(item)
 	switch selectedItem.title {
 	case chooseTracksAuto:
-		m.state = screenStreamTracks
-		return m, nil
+		m.state = screenLobby
+		return m, tea.Batch(m.spinner.Tick, m.startAudioServer())
 
 	case chooseTracksManually:
 		m.selectedTracks = &types.Playlist{}
@@ -117,7 +128,11 @@ func (m *model) handlePickDirEnter() (tea.Model, tea.Cmd) {
 		if info, err := os.Stat(selectedPath); err == nil && info.IsDir() {
 			m.dirToMp3Path = types.Path(selectedPath)
 			m.state = screenDownloadStarting
-			return m, m.spinner.Tick
+			return m, tea.Batch(
+				m.spinner.Tick,
+				buildPlaylistFromDir(m.dirToMp3Path, m.downloadEvents),
+				listenForDownloadEvents(m.downloadEvents),
+			)
 		}
 	}
 	return m, nil
@@ -128,7 +143,11 @@ func (m *model) handleYouTubeEnter() (tea.Model, tea.Cmd) {
 		m.youtubeURL = m.textInput.Value()
 		m.state = screenDownloadStarting
 
-		return m, tea.Batch(m.spinner.Tick, downloadYouTubeVideo(m.youtubeURL, m.downloader))
+		return m, tea.Batch(
+			m.spinner.Tick,
+			downloadYouTubeVideo(m.youtubeURL, m.downloader, m.downloadEvents),
+			listenForDownloadEvents(m.downloadEvents),
+		)
 	}
 	return m, nil
 }
@@ -136,8 +155,13 @@ func (m *model) handleYouTubeEnter() (tea.Model, tea.Cmd) {
 func (m *model) handleYouTubePlaylistEnter() (tea.Model, tea.Cmd) {
 	if m.textInput.Value() != "" {
 		m.youtubePlaylistURL = m.textInput.Value()
+		m.showDownloadProgress = true
 		m.state = screenDownloadStarting
-		return m, tea.Batch(m.spinner.Tick, downloadYouTubePlaylist(m.youtubePlaylistURL, m.downloader))
+		return m, tea.Batch(
+			m.spinner.Tick,
+			downloadYouTubePlaylist(m.youtubePlaylistURL, m.downloader, m.downloadEvents),
+			listenForDownloadEvents(m.downloadEvents),
+		)
 	}
 	return m, nil
 }
@@ -154,7 +178,14 @@ func (m *model) handleChooseTracksEnter() (tea.Model, tea.Cmd) {
 	}
 
 	m.selectedTracks = &selectedTracks
-	m.state = screenStreamTracks
+	m.state = screenLobby
+	return m, tea.Batch(m.spinner.Tick, m.startAudioServer())
+}
+
+func (m *model) handleLobbyEnter() (tea.Model, tea.Cmd) {
+	if m.audioServer != nil && len(m.connectedClients) > 0 {
+		return m, m.startPlayback()
+	}
 	return m, nil
 }
 
@@ -179,7 +210,11 @@ func (m *model) handleDKey() (tea.Model, tea.Cmd) {
 		if currentDir != "" {
 			m.dirToMp3Path = types.Path(currentDir)
 			m.state = screenDownloadStarting
-			return m, m.spinner.Tick
+			return m, tea.Batch(
+				m.spinner.Tick,
+				buildPlaylistFromDir(m.dirToMp3Path, m.downloadEvents),
+				listenForDownloadEvents(m.downloadEvents),
+			)
 		}
 	}
 
@@ -192,6 +227,14 @@ func (m *model) handleEscKey() (tea.Model, tea.Cmd) {
 		m.state = screenMenu
 		return m, nil
 	case screenChooseTracks:
+		m.state = screenChooseTracksOptions
+		return m, nil
+	case screenLobby:
+		if m.audioServer != nil {
+			m.audioServer.Stop()
+			m.audioServer = nil
+		}
+		m.connectedClients = nil
 		m.state = screenChooseTracksOptions
 		return m, nil
 	}

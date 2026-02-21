@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/charmbracelet/bubbles/filepicker"
 	"github.com/charmbracelet/bubbles/key"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/shricodev/gophercast/internal/downloader"
 	"github.com/shricodev/gophercast/internal/logger"
+	"github.com/shricodev/gophercast/pkg/protocol"
 	"github.com/shricodev/gophercast/pkg/types"
 	"github.com/shricodev/gophercast/server"
 )
@@ -53,6 +55,11 @@ type model struct {
 	audioServer *server.AudioServer
 	serverPort  int
 	serverError error
+
+	connectedClients  []protocol.ClientInfo
+	currentTrackTitle string
+	streamElapsed     time.Duration
+	downloadEvents    chan tea.Msg
 
 	logger *logger.Logger
 
@@ -187,6 +194,8 @@ func InitialModel() *model {
 		downloader:       d,
 		downloadProgress: &downloader.DownloadProgress{},
 
+		downloadEvents: make(chan tea.Msg, 16),
+
 		// this might change depending on if it is available or not
 		serverPort: 8080,
 
@@ -264,11 +273,14 @@ type (
 	serverStartedMsg struct {
 		port int
 	}
-	clientConnectedMsg struct {
-		port int
+	clientListUpdateMsg struct {
+		clients []protocol.ClientInfo
 	}
-	trackChangedMsg struct {
-		track types.Track
+	playbackStartedMsg struct{}
+	playbackStoppedMsg struct{ reason string }
+	streamTickMsg      struct {
+		elapsed time.Duration
+		track   string
 	}
 )
 
