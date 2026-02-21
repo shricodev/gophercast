@@ -101,10 +101,16 @@ func (s *AudioServer) runHub() {
 			s.mu.Lock()
 			if s.state == protocol.StatePlaying {
 				s.mu.Unlock()
+				// Write reject directly to the wire — the write goroutine
+				// may not be running yet so the channel route is unreliable.
 				rejectData, _ := protocol.MarshalEnvelope(protocol.MsgReject, protocol.RejectMsg{
-					Reason: "playback already in progress, join during lobby",
+					Reason: "playback already in progress, connect during lobby",
 				})
-				client.sendCtrl <- rejectData
+				client.conn.WriteMessage(websocket.TextMessage, rejectData)
+				client.conn.WriteMessage(
+					websocket.CloseMessage,
+					websocket.FormatCloseMessage(websocket.CloseNormalClosure, "rejected"),
+				)
 				client.conn.Close()
 				continue
 			}

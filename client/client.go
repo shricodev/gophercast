@@ -2,8 +2,11 @@ package client
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -12,6 +15,10 @@ import (
 
 	"github.com/shricodev/gophercast/pkg/protocol"
 )
+
+// Sentinel errors for clean shutdown handling.
+var ErrDisconnected = errors.New("disconnected")
+var ErrRejected = errors.New("rejected")
 
 // AudioClient connects to a GopherCast server and plays audio.
 type AudioClient struct {
@@ -24,6 +31,7 @@ type AudioClient struct {
 	bufferMu  sync.Mutex
 	buffer    []*protocol.AudioFrame
 	playing   atomic.Bool
+	closed    atomic.Bool
 }
 
 // NewAudioClient dials the server and sends a hello message.
@@ -58,21 +66,57 @@ func (c *AudioClient) Start() error {
 	for {
 		msgType, data, err := c.conn.ReadMessage()
 		if err != nil {
-			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-				return nil
-			}
-			return fmt.Errorf("read message: %w", err)
+			return c.classifyReadError(err)
 		}
 
 		switch msgType {
 		case websocket.TextMessage:
 			if err := c.handleControl(data); err != nil {
+				if errors.Is(err, ErrDisconnected) || errors.Is(err, ErrRejected) {
+					return err
+				}
 				return err
 			}
 		case websocket.BinaryMessage:
 			c.handleAudioFrame(data)
 		}
 	}
+}
+
+// classifyReadError turns raw connection errors into user-friendly results.
+func (c *AudioClient) classifyReadError(err error) error {
+	// User pressed Ctrl+C — clean exit
+	if c.closed.Load() {
+		return nil
+	}
+
+	// Normal WebSocket close handshake
+	if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+		return nil
+	}
+
+	// Server closed abruptly (e.g. rejected duplicate connection, server shutdown)
+	if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
+		return ErrDisconnected
+	}
+
+	// Connection reset / closed by peer
+	var netErr *net.OpError
+	if errors.As(err, &netErr) {
+		return ErrDisconnected
+	}
+
+	// "use of closed network connection" from our own Close()
+	if strings.Contains(err.Error(), "use of closed network connection") {
+		return nil
+	}
+
+	// Unexpected EOF
+	if strings.Contains(err.Error(), "unexpected EOF") {
+		return ErrDisconnected
+	}
+
+	return fmt.Errorf("connection error: %w", err)
 }
 
 // handleControl processes a JSON control message.
@@ -95,12 +139,9 @@ func (c *AudioClient) handleControl(data []byte) error {
 		if err := json.Unmarshal(env.Data, &msg); err != nil {
 			return fmt.Errorf("unmarshal stop_playback: %w", err)
 		}
-		fmt.Printf("Playback stopped: %s\n", msg.Reason)
 		c.playing.Store(false)
 		c.sink.Close()
-		if msg.Reason == "playlist_ended" || msg.Reason == "user_stopped" {
-			return nil
-		}
+		return nil
 
 	case protocol.MsgTrackChange:
 		var msg protocol.TrackChangeMsg
@@ -114,10 +155,10 @@ func (c *AudioClient) handleControl(data []byte) error {
 		if err := json.Unmarshal(env.Data, &msg); err != nil {
 			return fmt.Errorf("unmarshal reject: %w", err)
 		}
-		return fmt.Errorf("rejected by server: %s", msg.Reason)
+		return fmt.Errorf("%w: %s", ErrRejected, msg.Reason)
 
 	case protocol.MsgClientList:
-		// Informational — ignore on client side
+		// Informational
 
 	case protocol.MsgServerState:
 		var msg protocol.ServerStateMsg
@@ -132,8 +173,7 @@ func (c *AudioClient) handleControl(data []byte) error {
 
 // handleStartPlayback initializes the audio sink and schedules playback.
 func (c *AudioClient) handleStartPlayback(msg protocol.StartPlaybackMsg) error {
-	fmt.Printf("Starting playback: %s (sample rate: %d, channels: %d)\n",
-		msg.TrackTitle, msg.SampleRate, msg.Channels)
+	fmt.Printf("Now playing: %s\n", msg.TrackTitle)
 
 	if err := c.sink.Init(msg.SampleRate, msg.Channels); err != nil {
 		return fmt.Errorf("init audio sink: %w", err)
@@ -152,7 +192,7 @@ func (c *AudioClient) handleStartPlayback(msg protocol.StartPlaybackMsg) error {
 
 // handleTrackChange handles track transitions.
 func (c *AudioClient) handleTrackChange(msg protocol.TrackChangeMsg) error {
-	fmt.Printf("Track change: %s\n", msg.TrackTitle)
+	fmt.Printf("Now playing: %s\n", msg.TrackTitle)
 
 	c.playing.Store(false)
 	c.startAtNs = msg.StartAtNs
@@ -210,18 +250,19 @@ func (c *AudioClient) handleAudioFrame(data []byte) {
 		return
 	}
 
-	if frame.SeqNum != c.nextSeq && c.nextSeq > 0 {
-		fmt.Printf("frame gap: expected seq %d, got %d\n", c.nextSeq, frame.SeqNum)
-	}
-
 	c.sink.Write(frame.Payload)
 	c.nextSeq = frame.SeqNum + 1
 }
 
 // Close closes the connection and the audio sink.
 func (c *AudioClient) Close() {
+	c.closed.Store(true)
 	c.playing.Store(false)
 	if c.conn != nil {
+		c.conn.WriteMessage(
+			websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""),
+		)
 		c.conn.Close()
 	}
 	if c.sink != nil {

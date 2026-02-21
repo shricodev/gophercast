@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -29,6 +30,7 @@ Examples:
   gophercast play --host 192.168.1.10 --port 8080
   gophercast play --host 192.168.1.10 --port 8080 --name "Kitchen Speaker"
   gophercast play --host 192.168.1.10 --port 8080 --output recording.pcm`,
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		serverURL := fmt.Sprintf("ws://%s:%d/ws", host, port)
 
@@ -54,7 +56,9 @@ Examples:
 
 		c, err := client.NewAudioClient(serverURL, name, sink)
 		if err != nil {
-			return fmt.Errorf("failed to connect: %w", err)
+			fmt.Fprintf(os.Stderr, "Could not connect to server at %s\n", serverURL)
+			fmt.Fprintf(os.Stderr, "Make sure the server is running and the address is correct.\n")
+			return nil
 		}
 
 		sigCh := make(chan os.Signal, 1)
@@ -63,16 +67,31 @@ Examples:
 			<-sigCh
 			fmt.Println("\nDisconnecting...")
 			c.Close()
-			os.Exit(0)
 		}()
 
 		fmt.Println("Connected! Waiting for playback to start...")
-		if err := c.Start(); err != nil {
-			return fmt.Errorf("playback error: %w", err)
+
+		err = c.Start()
+		c.Close()
+
+		if err == nil {
+			fmt.Println("Playback finished.")
+			return nil
 		}
 
-		fmt.Println("Playback finished.")
-		c.Close()
+		// Handle specific error types with friendly messages
+		if errors.Is(err, client.ErrRejected) {
+			fmt.Fprintf(os.Stderr, "Server rejected the connection: %s\n", err)
+			fmt.Fprintf(os.Stderr, "You can only join during the lobby phase before playback starts.\n")
+			return nil
+		}
+
+		if errors.Is(err, client.ErrDisconnected) {
+			fmt.Println("Disconnected from server.")
+			return nil
+		}
+
+		fmt.Fprintf(os.Stderr, "Connection lost: %v\n", err)
 		return nil
 	},
 }
