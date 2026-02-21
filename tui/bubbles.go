@@ -1,6 +1,9 @@
 package tui
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	"github.com/charmbracelet/bubbles/progress"
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 func (m *model) updateBubbles(msg tea.Msg) []tea.Cmd {
 	var cmd tea.Cmd
@@ -19,7 +22,15 @@ func (m *model) updateBubbles(msg tea.Msg) []tea.Cmd {
 		m.textInput, cmd = m.textInput.Update(msg)
 		cmds = append(cmds, cmd)
 
-	case screenDownloadStarting, screenLobby:
+	case screenDownloadStarting:
+		m.spinner, cmd = m.spinner.Update(msg)
+		cmds = append(cmds, cmd)
+
+		progressModel, cmd := m.progress.Update(msg)
+		m.progress = progressModel.(progress.Model)
+		cmds = append(cmds, cmd)
+
+	case screenLobby:
 		m.spinner, cmd = m.spinner.Update(msg)
 		cmds = append(cmds, cmd)
 

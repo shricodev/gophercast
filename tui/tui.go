@@ -137,7 +137,7 @@ func listenForDownloadEvents(events chan tea.Msg) tea.Cmd {
 // Start starts the Bubble Tea TUI.
 func Start() (types.Path, string, string) {
 	m := InitialModel()
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	finalModel, err := p.Run()
 	if err != nil {
