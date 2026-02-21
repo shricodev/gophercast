@@ -23,9 +23,16 @@ import (
 	"github.com/shricodev/gophercast/server"
 )
 
+// headerHeight is the vertical space used by the banner + margins + spacing.
+// Banner (2 lines) + "Built with" (1) + padding/margins (~5) = ~8 lines.
+const headerHeight = 10
+
 // model represents the state of the TUI.
 type model struct {
 	state screen
+
+	windowWidth  int
+	windowHeight int
 
 	initialScreenList       list.Model
 	chooseTracksOptionsList list.Model
@@ -148,6 +155,7 @@ func InitialModel() *model {
 	fp := filepicker.New()
 	fp.DirAllowed = true
 	fp.FileAllowed = false
+	fp.Height = 20
 
 	// fp.ShowHidden is set to true because by default we save the files in the
 	// ~/.gophercast/downloads directory.
