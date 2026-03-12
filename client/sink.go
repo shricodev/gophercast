@@ -7,7 +7,6 @@ type AudioSink interface {
 	Init(sampleRate, channels int) error
 	Write(p []byte) (int, error)
 	Close() error
-	// Latency returns the estimated audio output pipeline latency.
-	// This is the delay between writing PCM data and sound exiting the speaker.
+	// Latency is how long it takes from writing PCM to hearing it out the speaker.
 	Latency() time.Duration
 }

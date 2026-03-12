@@ -15,7 +15,6 @@ const (
 	MsgReject        MessageType = "reject"
 )
 
-// ServerState represents the current state of the server.
 type ServerState string
 
 const (
@@ -30,18 +29,16 @@ type Envelope struct {
 	Data json.RawMessage `json:"data"`
 }
 
-// HelloMsg is sent from client to server on connect.
+// HelloMsg is sent by the client immediately after connecting.
 type HelloMsg struct {
 	Name           string `json:"name"`
 	AudioLatencyNs int64  `json:"audio_latency_ns,omitempty"`
 }
 
-// ServerStateMsg is sent from server to client to indicate the current state.
 type ServerStateMsg struct {
 	State ServerState `json:"state"`
 }
 
-// ClientInfo represents a single connected client.
 type ClientInfo struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`

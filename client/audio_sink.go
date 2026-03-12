@@ -8,8 +8,7 @@ import (
 	"github.com/ebitengine/oto/v3"
 )
 
-// defaultOtoLatency is the estimated audio pipeline latency for oto on Linux.
-// Includes oto internal buffer + OS audio subsystem (PipeWire/PulseAudio/ALSA).
+// rough estimate for the total latency on Linux (oto buffer + PipeWire/ALSA overhead)
 const defaultOtoLatency = 50 * time.Millisecond
 
 // SystemAudioSink plays PCM audio through the system audio output using oto.
@@ -20,17 +19,14 @@ type SystemAudioSink struct {
 	pipeW  *io.PipeWriter
 }
 
-// NewSystemAudioSink creates a new SystemAudioSink.
 func NewSystemAudioSink() *SystemAudioSink {
 	return &SystemAudioSink{}
 }
 
-// Init initializes the audio context (once) and creates a new player.
 func (s *SystemAudioSink) Init(sampleRate, channels int) error {
-	// Close previous player/pipe if any
 	s.closePlayer()
 
-	// Create the oto context only once — it cannot be recreated
+	// oto context can only be created once per process, so reuse it
 	if s.otoCtx == nil {
 		op := &oto.NewContextOptions{
 			SampleRate:   sampleRate,
@@ -53,7 +49,6 @@ func (s *SystemAudioSink) Init(sampleRate, channels int) error {
 	return nil
 }
 
-// Write writes PCM audio bytes to the player pipe.
 func (s *SystemAudioSink) Write(p []byte) (int, error) {
 	if s.pipeW == nil {
 		return 0, fmt.Errorf("audio sink not initialized")
@@ -61,7 +56,7 @@ func (s *SystemAudioSink) Write(p []byte) (int, error) {
 	return s.pipeW.Write(p)
 }
 
-// closePlayer stops the current player and pipe without destroying the context.
+// closePlayer tears down the pipe and player, but keeps the oto context alive.
 func (s *SystemAudioSink) closePlayer() {
 	if s.pipeW != nil {
 		s.pipeW.Close()
@@ -77,12 +72,10 @@ func (s *SystemAudioSink) closePlayer() {
 	}
 }
 
-// Latency returns the estimated audio output latency.
 func (s *SystemAudioSink) Latency() time.Duration {
 	return defaultOtoLatency
 }
 
-// Close stops playback and releases resources.
 func (s *SystemAudioSink) Close() error {
 	s.closePlayer()
 	return nil

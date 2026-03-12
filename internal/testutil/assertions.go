@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-// AssertNoErr fails the test if an error is not nil.
 func AssertNoErr(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
@@ -13,7 +12,6 @@ func AssertNoErr(t *testing.T, err error) {
 	}
 }
 
-// AssertErr fails the test if an error is nil.
 func AssertErr(t *testing.T, err error) {
 	t.Helper()
 	if err == nil {
@@ -21,8 +19,6 @@ func AssertErr(t *testing.T, err error) {
 	}
 }
 
-// AssertLen fails the test if the length of a slice is not equal to the
-// expected length.
 func AssertLen(t *testing.T, got, want int) {
 	t.Helper()
 	if got != want {
@@ -30,7 +26,6 @@ func AssertLen(t *testing.T, got, want int) {
 	}
 }
 
-// AssertNotEmpty fails the test if a string is empty.
 func AssertNotEmpty(t *testing.T, s string) {
 	t.Helper()
 	if s == "" {
@@ -38,7 +33,6 @@ func AssertNotEmpty(t *testing.T, s string) {
 	}
 }
 
-// AssertEmpty fails the test if a string is not empty.
 func AssertEmpty(t *testing.T, s string) {
 	t.Helper()
 	if s != "" {
@@ -46,7 +40,6 @@ func AssertEmpty(t *testing.T, s string) {
 	}
 }
 
-// AssertEqual fails the test if two strings are not equal.
 func AssertEqual(t *testing.T, got, want string) {
 	t.Helper()
 	if got != want {
@@ -54,7 +47,6 @@ func AssertEqual(t *testing.T, got, want string) {
 	}
 }
 
-// AssertContains fails the test if a string does not contain a substring.
 func AssertContains(t *testing.T, got, want string) {
 	t.Helper()
 	if !strings.Contains(got, want) {
@@ -62,7 +54,6 @@ func AssertContains(t *testing.T, got, want string) {
 	}
 }
 
-// AssertNotNil fails the test if a value is nil.
 func AssertNotNil(t *testing.T, got any) {
 	t.Helper()
 	if got == nil {

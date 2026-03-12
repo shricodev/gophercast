@@ -47,8 +47,7 @@ func (m *model) handleDownloadProgress(msg downloadProgressMsg) (tea.Model, tea.
 func (m *model) handleDownloadComplete(msg downloadCompleteMsg) (tea.Model, tea.Cmd) {
 	m.downloadedTracks = msg.tracks
 
-	// When the download completes, by default all tracks
-	// are selected.
+	// default to all tracks selected
 	m.selectedTracks = m.downloadedTracks
 
 	if m.youtubeURL != "" {
@@ -110,7 +109,7 @@ func (m *model) handleServerError(msg serverErrorMsg) (tea.Model, tea.Cmd) {
 func (m *model) handleClientListUpdate(msg clientListUpdateMsg) (tea.Model, tea.Cmd) {
 	m.connectedClients = msg.clients
 
-	// Auto-shutdown: all clients disconnected during playback
+	// if everyone disconnected mid-stream, just quit
 	if m.state == screenStreamTracks && len(m.connectedClients) == 0 {
 		if m.audioServer != nil {
 			m.audioServer.Stop()
@@ -148,7 +147,6 @@ func (m *model) handleStreamTick(msg streamTickMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// getServerAddresses returns the LAN addresses the server is reachable at.
 func (m *model) getServerAddresses() []string {
 	var addrs []string
 	ifaces, err := net.InterfaceAddrs()

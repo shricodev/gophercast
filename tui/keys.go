@@ -137,7 +137,7 @@ func (m *model) handleChooseTracksOptionsEnter() (tea.Model, tea.Cmd) {
 }
 
 func (m *model) handlePickDirEnter() (tea.Model, tea.Cmd) {
-	// Single file mode is handled in updateBubbles via DidSelectFile
+	// single file selection happens in updateBubbles via DidSelectFile
 	if m.pickMode == "file" {
 		return m, nil
 	}
@@ -165,9 +165,7 @@ func (m *model) handlePickDirEnter() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleFileSelected is called from updateBubbles after the filepicker
-// confirms a file selection. It creates a single-track playlist and
-// transitions straight to the lobby.
+// handleFileSelected builds a one-track playlist and jumps straight to the lobby.
 func (m *model) handleFileSelected(path string) tea.Cmd {
 	title := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	track := types.Track{

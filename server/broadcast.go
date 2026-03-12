@@ -37,7 +37,7 @@ func (s *AudioServer) broadcastAudioFrame(frame *protocol.AudioFrame) {
 		select {
 		case client.sendAudio <- data:
 		default:
-			// Drop frame for slow client — audio must not block
+			// slow client, just drop the frame rather than blocking
 		}
 	}
 }
@@ -57,16 +57,13 @@ func (s *AudioServer) sendControlTo(client *Client, msgType protocol.MessageType
 	}
 }
 
-// broadcastPlaybackStart sends per-client start/track-change messages with
-// adjusted start times to compensate for each client's audio pipeline latency.
-// The target time T is when sound should exit all speakers simultaneously.
-// Each client's start_at_ns is set to T - audioLatencyNs so that despite
-// different pipeline latencies, sound arrives at speakers at the same moment.
+// broadcastPlaybackStart sends each client a personalized start time.
+// The goal is to have sound come out of every speaker at the same moment,
+// so clients with higher latency get an earlier start_at_ns.
 func (s *AudioServer) broadcastPlaybackStart(msgType protocol.MessageType, trackTitle string, sampleRate, channels int, leadTime time.Duration) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	// Find the maximum audio latency across all clients.
 	var maxLatencyNs int64
 	for _, client := range s.clients {
 		if client.audioLatencyNs > maxLatencyNs {
@@ -74,13 +71,11 @@ func (s *AudioServer) broadcastPlaybackStart(msgType protocol.MessageType, track
 		}
 	}
 
-	// Target time: when sound should exit all speakers.
-	// Add maxLatency so the highest-latency client still has enough lead time.
+	// target = when we want sound to actually come out of speakers
 	targetTime := time.Now().Add(leadTime + time.Duration(maxLatencyNs))
 
 	for _, client := range s.clients {
-		// Each client starts writing PCM at targetTime - its own latency.
-		// The client with the highest latency starts earliest.
+		// client starts feeding PCM early enough that it arrives at the speaker by targetTime
 		clientStartNs := targetTime.Add(-time.Duration(client.audioLatencyNs)).UnixNano()
 
 		var data any

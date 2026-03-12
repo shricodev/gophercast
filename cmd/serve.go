@@ -21,7 +21,6 @@ var (
 	random bool
 )
 
-// serveCmd represents the serve command.
 var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Serve subcommand serves the audio either with a local file, a directory of audio files or a yt URL",
@@ -60,8 +59,6 @@ func init() {
 	sourceYoutubeStr := types.SourceYoutube.String()
 	sourceYoutubePlaylistStr := types.SourceYoutubePlaylist.String()
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
 	serveCmd.Flags().
 		StringVarP(&dirToMP3, sourceLocalDirStr, "d", "", "Path to the audio(mp3) directory")
 	serveCmd.Flags().StringVarP(&ytURL, sourceYoutubeStr, "y", "", "Link to the youtube video")
@@ -77,7 +74,5 @@ func init() {
 		sourceYoutubePlaylistStr,
 	)
 
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
 	// serveCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

@@ -21,7 +21,6 @@ type Client struct {
 	audioLatencyNs int64 // client-reported audio pipeline latency
 }
 
-// readMessages reads messages from the WebSocket connection.
 func (c *Client) readMessages() {
 	defer func() {
 		c.server.unregister <- c
@@ -46,7 +45,6 @@ func (c *Client) readMessages() {
 	}
 }
 
-// handleTextMessage processes a JSON control message from the client.
 func (c *Client) handleTextMessage(data []byte) {
 	env, err := protocol.ParseEnvelope(data)
 	if err != nil {
@@ -67,7 +65,6 @@ func (c *Client) handleTextMessage(data []byte) {
 	}
 }
 
-// writeMessages writes messages to the WebSocket connection.
 func (c *Client) writeMessages() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer func() {
@@ -105,7 +102,6 @@ func (c *Client) writeMessages() {
 	}
 }
 
-// Info returns the client's public info.
 func (c *Client) Info() protocol.ClientInfo {
 	return protocol.ClientInfo{
 		ID:   c.id,

@@ -13,18 +13,16 @@ import (
 )
 
 const (
-	// pcmChunkSize is the number of decoded PCM bytes per audio frame.
-	// 4096 bytes = 1024 samples of stereo 16-bit = ~23ms at 44.1kHz.
+	// 4096 bytes = 1024 stereo 16-bit samples = ~23ms at 44.1kHz
 	pcmChunkSize = 4096
 
-	// playbackLeadTime is the delay before playback starts so clients can buffer.
+	// how much lead time to give clients before first track starts
 	playbackLeadTime = 750 * time.Millisecond
 
-	// trackChangeLeadTime is the delay before the next track starts.
+	// shorter lead time for subsequent tracks since sink is already warm
 	trackChangeLeadTime = 500 * time.Millisecond
 )
 
-// streamPlaylist iterates through all tracks in the playlist and streams them.
 func (s *AudioServer) streamPlaylist() {
 	for i := 0; i < s.playlist.Len(); i++ {
 		select {
@@ -52,20 +50,16 @@ func (s *AudioServer) streamPlaylist() {
 			msgType = protocol.MsgTrackChange
 		}
 
-		// Send per-client start times adjusted for audio pipeline latency.
-		// broadcastPlaybackStart adds maxLatency to the lead time so the
-		// highest-latency client still has enough buffering time.
+		// each client gets a personalized start_at_ns adjusted for their latency
 		s.broadcastPlaybackStart(msgType, track.Title, sampleRate, channels, leadTime)
 
-		// Compute the effective wait: leadTime + max client latency.
-		// This matches the target time calculation in broadcastPlaybackStart.
+		// wait the same duration we told clients to wait before sending audio
 		effectiveWait := leadTime + s.maxClientLatency()
 
 		s.mu.Lock()
 		s.playbackStart = time.Now().Add(effectiveWait)
 		s.mu.Unlock()
 
-		// Wait for all clients to be ready before streaming.
 		time.Sleep(effectiveWait)
 
 		if err := s.streamTrack(&track, sampleRate, channels); err != nil {
@@ -81,11 +75,9 @@ func (s *AudioServer) streamPlaylist() {
 		Reason: "playlist_ended",
 	})
 
-	// Signal TUI that playback is done.
 	close(s.playbackDoneCh)
 }
 
-// streamTrack decodes an MP3 file to PCM and streams it at the correct bitrate.
 func (s *AudioServer) streamTrack(track *types.Track, sampleRate, channels int) error {
 	f, err := os.Open(track.Path.String())
 	if err != nil {
@@ -103,8 +95,7 @@ func (s *AudioServer) streamTrack(track *types.Track, sampleRate, channels int) 
 	var sampleOffset uint64
 	startTime := time.Now()
 
-	// bytesPerSample = channels * 2 (16-bit)
-	bytesPerSample := channels * 2
+	bytesPerSample := channels * 2 // 16-bit samples
 
 	for {
 		select {
@@ -125,7 +116,7 @@ func (s *AudioServer) streamTrack(track *types.Track, sampleRate, channels int) 
 			seqNum++
 			sampleOffset += uint64(n / bytesPerSample)
 
-			// Pace to real time using wall-clock drift correction
+			// pace output to real time so clients don't buffer too far ahead
 			expectedElapsed := time.Duration(float64(sampleOffset) / float64(sampleRate) * float64(time.Second))
 			actualElapsed := time.Since(startTime)
 			if expectedElapsed > actualElapsed {
@@ -144,9 +135,8 @@ func (s *AudioServer) streamTrack(track *types.Track, sampleRate, channels int) 
 	return nil
 }
 
-// maxClientLatency returns the maximum audio pipeline latency reported by
-// any connected client. Used to ensure the lead time accounts for the
-// slowest audio pipeline so all clients can start on time.
+// maxClientLatency finds the worst-case latency among connected clients.
+// We use this to set a lead time that works for everyone, including the slow ones.
 func (s *AudioServer) maxClientLatency() time.Duration {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -160,13 +150,12 @@ func (s *AudioServer) maxClientLatency() time.Duration {
 	return time.Duration(maxNs)
 }
 
-// determinePCMParams opens an MP3 file and returns its sample rate and channel count.
-// go-mp3 always decodes to stereo (2 channels) 16-bit signed LE.
+// determinePCMParams reads the sample rate from the MP3 header.
+// Note: go-mp3 always decodes to stereo 16-bit LE regardless of the source.
 func determinePCMParams(trackPath types.Path) (sampleRate int, channels int) {
 	f, err := os.Open(trackPath.String())
 	if err != nil {
-		// Fallback to CD-quality defaults
-		return 44100, 2
+		return 44100, 2 // fallback to CD quality
 	}
 	defer f.Close()
 

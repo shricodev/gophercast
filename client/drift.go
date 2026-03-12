@@ -3,22 +3,17 @@ package client
 import "time"
 
 const (
-	// driftCheckInterval is how often (in frames) to measure and correct drift.
-	// At 44.1kHz with 4096-byte chunks (~23ms each), 50 frames ≈ 1.15 seconds.
+	// check every ~1.15s at 44.1kHz (50 frames * ~23ms each)
 	driftCheckInterval uint32 = 50
 
-	// driftThreshold is the minimum drift before correction is applied.
-	// Below this, the difference is imperceptible.
+	// anything less than this is basically inaudible, don't bother correcting
 	driftThreshold = 2 * time.Millisecond
 
-	// maxCorrectionSamples caps the per-check correction to avoid audible artifacts.
-	// 32 samples at 44.1kHz ≈ 0.7ms — inaudible as a single skip/duplicate.
+	// cap correction to 32 samples (~0.7ms) so we don't get audible glitches
 	maxCorrectionSamples = 32
 )
 
-// driftCorrector tracks the relationship between wall-clock time and samples
-// written to the audio sink, applying micro-corrections to keep playback
-// aligned with the server's timeline.
+// driftCorrector nudges playback to stay aligned with the server's clock.
 type driftCorrector struct {
 	sampleRate     int
 	bytesPerSample int
@@ -26,7 +21,6 @@ type driftCorrector struct {
 	startTime      time.Time
 }
 
-// reset prepares the corrector for a new track.
 func (d *driftCorrector) reset(sampleRate, channels int, startTime time.Time) {
 	d.sampleRate = sampleRate
 	d.bytesPerSample = channels * 2 // 16-bit signed LE
@@ -34,19 +28,12 @@ func (d *driftCorrector) reset(sampleRate, channels int, startTime time.Time) {
 	d.startTime = startTime
 }
 
-// written records that n bytes of PCM were sent to the audio sink.
 func (d *driftCorrector) written(n int) {
 	d.samplesWritten += uint64(n / d.bytesPerSample)
 }
 
-// correct checks the drift between wall-clock elapsed time and expected
-// playback position, returning a possibly adjusted payload.
-//
-// If the audio hardware consumes samples slower than the declared rate,
-// we fall behind schedule — correct by trimming samples from the payload.
-// If the hardware is faster, we get ahead — correct by duplicating samples.
-//
-// shouldCheck indicates whether this frame should trigger a drift check.
+// correct trims or duplicates a few samples to compensate for drift.
+// If we're behind, trim from the end. If we're ahead, duplicate from the end.
 func (d *driftCorrector) correct(payload []byte, shouldCheck bool) []byte {
 	if !shouldCheck || d.sampleRate == 0 || d.startTime.IsZero() {
 		return payload
@@ -59,7 +46,7 @@ func (d *driftCorrector) correct(payload []byte, shouldCheck bool) []byte {
 	drift := actualElapsed - expectedElapsed
 
 	if drift > driftThreshold {
-		// Behind schedule (late) — trim samples from the end of the payload.
+		// behind - trim some samples off the end
 		correction := int(drift.Seconds() * float64(d.sampleRate))
 		if correction > maxCorrectionSamples {
 			correction = maxCorrectionSamples
@@ -69,7 +56,7 @@ func (d *driftCorrector) correct(payload []byte, shouldCheck bool) []byte {
 			return payload[:len(payload)-bytesToTrim]
 		}
 	} else if drift < -driftThreshold {
-		// Ahead of schedule (early) — duplicate samples at the end of the payload.
+		// ahead - pad with a few duplicate samples at the end
 		correction := int((-drift).Seconds() * float64(d.sampleRate))
 		if correction > maxCorrectionSamples {
 			correction = maxCorrectionSamples

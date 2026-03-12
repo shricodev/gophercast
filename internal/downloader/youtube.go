@@ -22,7 +22,6 @@ var (
 	errOperationCancelled error = errors.New("operation cancelled")
 )
 
-// DownloadConfig holds the configuration for downloading videos.
 type DownloadConfig struct {
 	OutputDir types.Path
 	Quality   string
@@ -30,7 +29,6 @@ type DownloadConfig struct {
 	Workers   int
 }
 
-// DefaultConfig returns a default download configuration.
 func DefaultConfig() *DownloadConfig {
 	homeDir, _ := os.UserHomeDir()
 	return &DownloadConfig{
@@ -41,7 +39,6 @@ func DefaultConfig() *DownloadConfig {
 	}
 }
 
-// Downloader is a YouTube downloader.
 type Downloader struct {
 	config     *DownloadConfig
 	ctx        context.Context
@@ -54,7 +51,6 @@ type Downloader struct {
 	currentProgress  DownloadProgress
 }
 
-// NewDownloader creates a new Downloader instance.
 func NewDownloader(config *DownloadConfig) *Downloader {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Downloader{
@@ -64,7 +60,6 @@ func NewDownloader(config *DownloadConfig) *Downloader {
 	}
 }
 
-// DownloadVideo downloads a single YouTube video.
 func (d *Downloader) DownloadVideo(url string) (types.Track, error) {
 	if d.IsShutdown() {
 		return types.Track{}, errDownloaderShutdown
@@ -135,7 +130,6 @@ func (d *Downloader) DownloadVideo(url string) (types.Track, error) {
 	return track, nil
 }
 
-// DownloadPlaylist downloads an entire YouTube playlist.
 func (d *Downloader) DownloadPlaylist(url string) (*types.Playlist, error) {
 	if d.IsShutdown() {
 		return nil, errDownloaderShutdown
@@ -176,7 +170,6 @@ func (d *Downloader) DownloadPlaylist(url string) (*types.Playlist, error) {
 	return tracks, nil
 }
 
-// SetProgressCallback sets the progress callback function.
 func (d *Downloader) SetProgressCallback(progressCallback ProgressCallback) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -184,7 +177,7 @@ func (d *Downloader) SetProgressCallback(progressCallback ProgressCallback) {
 	d.progressCallback = progressCallback
 }
 
-// Shutdown gracefully shuts down the downloader, waiting for all active downloads to complete.
+// Shutdown cancels in-flight downloads and waits for workers to finish.
 func (d *Downloader) Shutdown() {
 	d.mu.Lock()
 	if d.isShutdown {
@@ -199,7 +192,6 @@ func (d *Downloader) Shutdown() {
 	d.wg.Wait()
 }
 
-// IsShutdown returns true if the downloader is in a shutdown state.
 func (d *Downloader) IsShutdown() bool {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
@@ -207,20 +199,17 @@ func (d *Downloader) IsShutdown() bool {
 	return d.isShutdown
 }
 
-// PlaylistVideo represents a single video in a YouTube playlist.
 type PlaylistVideo struct {
 	URL   string `json:"url"`
 	Title string `json:"title"`
 	ID    string `json:"id"`
 }
 
-// PlaylistInfo represents information about a YouTube playlist.
 type PlaylistInfo struct {
 	Title   string          `json:"title"`
 	Entries []PlaylistVideo `json:"entries"`
 }
 
-// DownloadProgress represents the progress of a download operation.
 type DownloadProgress struct {
 	Completed int
 	Total     int
@@ -228,10 +217,8 @@ type DownloadProgress struct {
 	Failed    []string
 }
 
-// ProgressCallback is a function type for reporting download progress.
 type ProgressCallback func(progress DownloadProgress)
 
-// downloadVideosConcurrently downloads multiple videos in parallel.
 func (d *Downloader) downloadVideosConcurrently(
 	videos []PlaylistVideo,
 	outputDir types.Path,
@@ -264,7 +251,7 @@ func (d *Downloader) downloadVideosConcurrently(
 	for completed < len(videos) {
 		select {
 		case <-d.ctx.Done():
-			// Only wait for downloads that have actually started
+			// only wait for the ones we already kicked off
 			expectedResults := started
 			d.wg.Wait()
 			close(resultsCh)
@@ -318,7 +305,6 @@ func (d *Downloader) downloadVideosConcurrently(
 	return &tracks, nil
 }
 
-// downloadSingleVideoFromYtPlaylist downloads a single video from a playlist.
 func (d *Downloader) downloadSingleVideoFromYtPlaylist(
 	video PlaylistVideo,
 	outputDir types.Path,
@@ -384,7 +370,6 @@ func (d *Downloader) downloadSingleVideoFromYtPlaylist(
 	return track, nil
 }
 
-// getPlaylistInfo fetches information about a YouTube playlist.
 func (d *Downloader) getPlaylistInfo(url string) (*PlaylistInfo, error) {
 	cmd := exec.CommandContext(d.ctx, "yt-dlp",
 		"--flat-playlist",
@@ -413,14 +398,12 @@ func (d *Downloader) getPlaylistInfo(url string) (*PlaylistInfo, error) {
 	return &info, nil
 }
 
-// downloadResult represents the result of a single video download.
 type downloadResult struct {
 	track types.Track
 	video PlaylistVideo
 	err   error
 }
 
-// worker is a concurrent worker for downloading videos.
 func (d *Downloader) worker(
 	jobs <-chan PlaylistVideo,
 	results chan<- downloadResult,
@@ -436,7 +419,6 @@ func (d *Downloader) worker(
 				return
 			}
 
-			// Signal that we've started this download
 			select {
 			case started <- true:
 			case <-d.ctx.Done():

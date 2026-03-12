@@ -23,11 +23,9 @@ import (
 	"github.com/shricodev/gophercast/server"
 )
 
-// headerHeight is the vertical space used by the banner + margins + spacing.
-// Banner (2 lines) + "Built with" (1) + padding/margins (~5) = ~8 lines.
+// headerHeight accounts for the banner, the "Built with" line, and some padding
 const headerHeight = 10
 
-// model represents the state of the TUI.
 type model struct {
 	state    screen
 	pickMode string // "dir" or "file"
@@ -76,12 +74,10 @@ type model struct {
 	err error
 }
 
-// Init initializes the TUI model.
 func (m *model) Init() tea.Cmd {
 	return nil
 }
 
-// Update handles messages and updates the model accordingly.
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
@@ -132,7 +128,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// InitialModel returns the initial model for the TUI.
 func InitialModel() *model {
 	initialScreenChoices := []list.Item{
 		item{title: singleFile, desc: "Pick a single mp3 audio file"},
@@ -251,21 +246,14 @@ func newSelectedTracksList(tracks *types.Playlist) list.Model {
 	return l
 }
 
-// item is an item in the list that holds the title and the description. This
-// is what's shown in the initial page when the application runs with the serve
-// subcommand
+// item is used for all the list menus throughout the TUI
 type item struct {
 	title, desc string
 	selected    bool
 }
 
-// Title satisfies the list.Item interface
-func (i item) Title() string { return i.title }
-
-// Description satisfies the list.Item interface
+func (i item) Title() string       { return i.title }
 func (i item) Description() string { return i.desc }
-
-// FilterValue satisfies the list.Item interface
 func (i item) FilterValue() string { return i.title }
 
 type (
@@ -303,10 +291,8 @@ type (
 	}
 )
 
-// errMsg represents an error message.
 type errMsg struct{ err error }
 
-// Implements the error interface.
 func (e errMsg) Error() string {
 	return e.err.Error()
 }

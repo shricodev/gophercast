@@ -21,7 +21,6 @@ var (
 	latencyMs  int
 )
 
-// playCmd represents the play command.
 var playCmd = &cobra.Command{
 	Use:   "play",
 	Short: "Connect to a GopherCast server and play audio",
@@ -82,7 +81,6 @@ Examples:
 			return nil
 		}
 
-		// Handle specific error types with friendly messages
 		if errors.Is(err, client.ErrRejected) {
 			fmt.Fprintf(os.Stderr, "Server rejected the connection: %s\n", err)
 			fmt.Fprintf(os.Stderr, "You can only join during the lobby phase before playback starts.\n")

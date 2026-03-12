@@ -42,7 +42,6 @@ var (
 	helpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Padding(1, 0)
 )
 
-// downloadYouTubeVideo starts a YouTube video download using the channel pattern.
 func downloadYouTubeVideo(url string, d *downloader.Downloader, events chan tea.Msg) tea.Cmd {
 	return func() tea.Msg {
 		d.SetProgressCallback(func(progress downloader.DownloadProgress) {
@@ -68,7 +67,6 @@ func downloadYouTubeVideo(url string, d *downloader.Downloader, events chan tea.
 	}
 }
 
-// downloadYouTubePlaylist starts a YouTube playlist download using the channel pattern.
 func downloadYouTubePlaylist(url string, d *downloader.Downloader, events chan tea.Msg) tea.Cmd {
 	return func() tea.Msg {
 		d.SetProgressCallback(func(progress downloader.DownloadProgress) {
@@ -105,7 +103,6 @@ func downloadYouTubePlaylist(url string, d *downloader.Downloader, events chan t
 	}
 }
 
-// buildPlaylistFromDir scans a directory for MP3 files in the background.
 func buildPlaylistFromDir(dirPath types.Path, events chan tea.Msg) tea.Cmd {
 	return func() tea.Msg {
 		go func() {
@@ -124,7 +121,6 @@ func buildPlaylistFromDir(dirPath types.Path, events chan tea.Msg) tea.Cmd {
 	}
 }
 
-// listenForDownloadEvents blocks on the events channel and returns messages.
 func listenForDownloadEvents(events chan tea.Msg) tea.Cmd {
 	return func() tea.Msg {
 		msg, ok := <-events
@@ -135,7 +131,6 @@ func listenForDownloadEvents(events chan tea.Msg) tea.Cmd {
 	}
 }
 
-// Start starts the Bubble Tea TUI.
 func Start() (types.Path, string, string) {
 	m := InitialModel()
 	p := tea.NewProgram(m, tea.WithAltScreen())

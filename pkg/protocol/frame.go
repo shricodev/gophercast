@@ -5,18 +5,15 @@ import (
 	"fmt"
 )
 
-// AudioFrameHeaderSize is the size of the binary audio frame header in bytes.
-// 4 bytes for sequence number + 8 bytes for sample offset.
+// AudioFrameHeaderSize is 12 bytes: 4B seq + 8B sample offset.
 const AudioFrameHeaderSize = 12
 
-// AudioFrame represents a single audio frame with metadata.
 type AudioFrame struct {
 	SeqNum       uint32
 	SampleOffset uint64
 	Payload      []byte
 }
 
-// MarshalBinary serializes an AudioFrame into bytes.
 func (f *AudioFrame) MarshalBinary() []byte {
 	buf := make([]byte, AudioFrameHeaderSize+len(f.Payload))
 	binary.BigEndian.PutUint32(buf[0:4], f.SeqNum)
@@ -25,7 +22,6 @@ func (f *AudioFrame) MarshalBinary() []byte {
 	return buf
 }
 
-// UnmarshalAudioFrame deserializes bytes into an AudioFrame.
 func UnmarshalAudioFrame(data []byte) (*AudioFrame, error) {
 	if len(data) < AudioFrameHeaderSize {
 		return nil, fmt.Errorf("audio frame too short: %d bytes", len(data))

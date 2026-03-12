@@ -49,7 +49,6 @@ type AudioServer struct {
 	playbackStart     time.Time
 }
 
-// NewAudioServer creates a new AudioServer instance.
 func NewAudioServer(playlist *types.Playlist, port int, log *logger.Logger) *AudioServer {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &AudioServer{
@@ -67,7 +66,6 @@ func NewAudioServer(playlist *types.Playlist, port int, log *logger.Logger) *Aud
 	}
 }
 
-// ListenAndServe starts the HTTP server and the hub goroutine.
 func (s *AudioServer) ListenAndServe() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", s.handleWebSocket)
@@ -92,7 +90,7 @@ func (s *AudioServer) ListenAndServe() error {
 	return nil
 }
 
-// runHub processes client register/unregister events.
+// runHub handles client register/unregister events in a dedicated goroutine.
 func (s *AudioServer) runHub() {
 	for {
 		select {
@@ -103,8 +101,8 @@ func (s *AudioServer) runHub() {
 			s.mu.Lock()
 			if s.state == protocol.StatePlaying {
 				s.mu.Unlock()
-				// Write reject directly to the wire — the write goroutine
-				// may not be running yet so the channel route is unreliable.
+				// write directly to the wire since the writeMessages goroutine
+				// might not be running yet
 				rejectData, _ := protocol.MarshalEnvelope(protocol.MsgReject, protocol.RejectMsg{
 					Reason: "playback already in progress, connect during lobby",
 				})
@@ -139,7 +137,6 @@ func (s *AudioServer) runHub() {
 	}
 }
 
-// handleWebSocket upgrades HTTP connections to WebSocket and registers clients.
 func (s *AudioServer) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -163,7 +160,6 @@ func (s *AudioServer) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	go client.writeMessages()
 }
 
-// StartPlayback transitions from lobby to playing and begins streaming.
 func (s *AudioServer) StartPlayback() error {
 	s.mu.Lock()
 	if s.state != protocol.StateLobby {
@@ -184,25 +180,20 @@ func (s *AudioServer) StartPlayback() error {
 	return nil
 }
 
-// Stop gracefully shuts down the audio server.
 func (s *AudioServer) Stop() error {
 	s.cancel()
 
-	// Write stop message directly to each client's connection, then initiate
-	// a WebSocket close handshake. This bypasses the channel so there's no
-	// race between sending the message and closing the connection.
-	stopData, _ := protocol.MarshalEnvelope(protocol.MsgStopPlayback, protocol.StopPlaybackMsg{
+	// route stop through the channel so writeMessages sends the ws close frame.
+	// closing sendCtrl after is what causes writeMessages to exit cleanly.
+	s.broadcastControl(protocol.MsgStopPlayback, protocol.StopPlaybackMsg{
 		Reason: "user_stopped",
 	})
 
 	s.mu.Lock()
-	for _, client := range s.clients {
-		client.conn.WriteMessage(websocket.TextMessage, stopData)
-		client.conn.WriteMessage(
-			websocket.CloseMessage,
-			websocket.FormatCloseMessage(websocket.CloseNormalClosure, "server stopped"),
-		)
-		client.conn.Close()
+	for id, client := range s.clients {
+		close(client.sendCtrl)
+		close(client.sendAudio)
+		delete(s.clients, id)
 	}
 	s.mu.Unlock()
 
@@ -214,17 +205,15 @@ func (s *AudioServer) Stop() error {
 	return nil
 }
 
-// ClientChangeChan returns a channel that receives client list updates.
 func (s *AudioServer) ClientChangeChan() <-chan []protocol.ClientInfo {
 	return s.clientChangeCh
 }
 
-// PlaybackDoneChan returns a channel that is closed when the playlist finishes.
 func (s *AudioServer) PlaybackDoneChan() <-chan struct{} {
 	return s.playbackDoneCh
 }
 
-// Clients returns a thread-safe snapshot of connected clients.
+// Clients returns a snapshot of connected clients (safe to call from any goroutine).
 func (s *AudioServer) Clients() []protocol.ClientInfo {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -236,26 +225,22 @@ func (s *AudioServer) Clients() []protocol.ClientInfo {
 	return clients
 }
 
-// Port returns the port the server is listening on.
 func (s *AudioServer) Port() int {
 	return s.port
 }
 
-// State returns the current server state.
 func (s *AudioServer) State() protocol.ServerState {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.state
 }
 
-// CurrentTrackTitle returns the title of the currently playing track.
 func (s *AudioServer) CurrentTrackTitle() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.currentTrackTitle
 }
 
-// PlaybackElapsed returns how long the current track has been playing.
 func (s *AudioServer) PlaybackElapsed() time.Duration {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -265,7 +250,7 @@ func (s *AudioServer) PlaybackElapsed() time.Duration {
 	return time.Since(s.playbackStart)
 }
 
-// pushClientChange sends the current client list to the TUI channel (non-blocking).
+// pushClientChange sends the updated client list to the TUI (drops if nobody's listening).
 func (s *AudioServer) pushClientChange() {
 	clients := s.Clients()
 	select {

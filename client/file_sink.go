@@ -6,18 +6,16 @@ import (
 	"time"
 )
 
-// FileSink writes raw PCM audio data to a file.
+// FileSink writes raw PCM audio data to a file. Mostly useful for debugging.
 type FileSink struct {
 	path string
 	file *os.File
 }
 
-// NewFileSink creates a new FileSink that writes to the given path.
 func NewFileSink(path string) *FileSink {
 	return &FileSink{path: path}
 }
 
-// Init opens the output file.
 func (s *FileSink) Init(sampleRate, channels int) error {
 	f, err := os.Create(s.path)
 	if err != nil {
@@ -27,7 +25,6 @@ func (s *FileSink) Init(sampleRate, channels int) error {
 	return nil
 }
 
-// Write writes PCM bytes to the file.
 func (s *FileSink) Write(p []byte) (int, error) {
 	if s.file == nil {
 		return 0, fmt.Errorf("file sink not initialized")
@@ -35,12 +32,10 @@ func (s *FileSink) Write(p []byte) (int, error) {
 	return s.file.Write(p)
 }
 
-// Latency returns zero since file output has no playback latency.
 func (s *FileSink) Latency() time.Duration {
 	return 0
 }
 
-// Close closes the output file.
 func (s *FileSink) Close() error {
 	if s.file != nil {
 		return s.file.Close()

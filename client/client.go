@@ -44,8 +44,7 @@ type AudioClient struct {
 	audioLatencyNs int64
 }
 
-// NewAudioClient dials the server and sends a hello message.
-// latencyOverride, if positive, overrides the sink's estimated audio latency.
+// NewAudioClient dials the server and sends a hello. Pass latencyOverride > 0 to skip auto-detection.
 func NewAudioClient(serverURL, name string, sink AudioSink, latencyOverride time.Duration) (*AudioClient, error) {
 	conn, _, err := websocket.DefaultDialer.Dial(serverURL, nil)
 	if err != nil {
@@ -81,7 +80,6 @@ func NewAudioClient(serverURL, name string, sink AudioSink, latencyOverride time
 	return c, nil
 }
 
-// Start is the main loop that reads messages from the server.
 func (c *AudioClient) Start() error {
 	for {
 		msgType, data, err := c.conn.ReadMessage()
@@ -103,35 +101,33 @@ func (c *AudioClient) Start() error {
 	}
 }
 
-// classifyReadError turns raw connection errors into user-friendly results.
 func (c *AudioClient) classifyReadError(err error) error {
-	// User pressed Ctrl+C — clean exit
+	// user pressed ctrl+c, we already called Close()
 	if c.closed.Load() {
 		return nil
 	}
 
-	// Normal WebSocket close handshake
+	// normal ws close handshake
 	if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 		return nil
 	}
 
-	// Server closed abruptly (e.g. rejected duplicate connection, server shutdown)
+	// server closed abruptly (rejected, crashed, etc.)
 	if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
 		return ErrDisconnected
 	}
 
-	// Connection reset / closed by peer
+	// connection reset by peer
 	var netErr *net.OpError
 	if errors.As(err, &netErr) {
 		return ErrDisconnected
 	}
 
-	// "use of closed network connection" from our own Close()
+	// triggered when we call conn.Close() ourselves
 	if strings.Contains(err.Error(), "use of closed network connection") {
 		return nil
 	}
 
-	// Unexpected EOF
 	if strings.Contains(err.Error(), "unexpected EOF") {
 		return ErrDisconnected
 	}
@@ -139,7 +135,6 @@ func (c *AudioClient) classifyReadError(err error) error {
 	return fmt.Errorf("connection error: %w", err)
 }
 
-// handleControl processes a JSON control message.
 func (c *AudioClient) handleControl(data []byte) error {
 	env, err := protocol.ParseEnvelope(data)
 	if err != nil {
@@ -161,7 +156,6 @@ func (c *AudioClient) handleControl(data []byte) error {
 		}
 		c.playing.Store(false)
 		c.sink.Close()
-		// Signal clean exit so the client shuts down gracefully.
 		return ErrDisconnected
 
 	case protocol.MsgTrackChange:
@@ -192,9 +186,8 @@ func (c *AudioClient) handleControl(data []byte) error {
 	return nil
 }
 
-// handleStartPlayback initializes the audio sink and schedules playback.
-// Sink init runs in a goroutine so it doesn't block the read loop — oto
-// context creation can be slow on some platforms (especially Windows).
+// handleStartPlayback kicks off sink init in a goroutine so the read loop stays unblocked.
+// oto context creation can be slow on some systems.
 func (c *AudioClient) handleStartPlayback(msg protocol.StartPlaybackMsg) error {
 	fmt.Printf("Now playing: %s\n", msg.TrackTitle)
 
@@ -217,7 +210,6 @@ func (c *AudioClient) handleStartPlayback(msg protocol.StartPlaybackMsg) error {
 	return nil
 }
 
-// handleTrackChange handles track transitions.
 func (c *AudioClient) handleTrackChange(msg protocol.TrackChangeMsg) error {
 	fmt.Printf("Now playing: %s\n", msg.TrackTitle)
 
@@ -241,7 +233,6 @@ func (c *AudioClient) handleTrackChange(msg protocol.TrackChangeMsg) error {
 	return nil
 }
 
-// waitAndPlay sleeps until startAtNs, then flushes the buffer and starts playing.
 func (c *AudioClient) waitAndPlay(sampleRate, channels int) {
 	startTime := time.Unix(0, c.startAtNs)
 	sleepDuration := time.Until(startTime)
@@ -249,8 +240,7 @@ func (c *AudioClient) waitAndPlay(sampleRate, channels int) {
 		time.Sleep(sleepDuration)
 	}
 
-	// Initialize drift corrector anchored to the target start time.
-	// This is the server's reference clock — all clients align to it.
+	// anchor drift corrector to the server's start time so all clients stay in sync
 	c.drift.reset(sampleRate, channels, startTime)
 
 	c.bufferMu.Lock()
@@ -258,7 +248,6 @@ func (c *AudioClient) waitAndPlay(sampleRate, channels int) {
 	c.buffer = nil
 	c.bufferMu.Unlock()
 
-	// Sort buffered frames by sequence number
 	sort.Slice(buffered, func(i, j int) bool {
 		return buffered[i].SeqNum < buffered[j].SeqNum
 	})
@@ -272,7 +261,6 @@ func (c *AudioClient) waitAndPlay(sampleRate, channels int) {
 	c.playing.Store(true)
 }
 
-// handleAudioFrame processes a binary audio frame.
 func (c *AudioClient) handleAudioFrame(data []byte) {
 	frame, err := protocol.UnmarshalAudioFrame(data)
 	if err != nil {
@@ -286,8 +274,6 @@ func (c *AudioClient) handleAudioFrame(data []byte) {
 		return
 	}
 
-	// Apply drift correction periodically to keep playback aligned
-	// with the server's wall-clock timeline.
 	shouldCheck := frame.SeqNum%driftCheckInterval == 0
 	payload := c.drift.correct(frame.Payload, shouldCheck)
 
@@ -296,7 +282,6 @@ func (c *AudioClient) handleAudioFrame(data []byte) {
 	c.nextSeq = frame.SeqNum + 1
 }
 
-// Close closes the connection and the audio sink.
 func (c *AudioClient) Close() {
 	c.closed.Store(true)
 	c.playing.Store(false)

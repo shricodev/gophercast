@@ -5,7 +5,6 @@ import (
 	"fmt"
 )
 
-// MarshalEnvelope creates a JSON envelope for a control message.
 func MarshalEnvelope(msgType MessageType, data any) ([]byte, error) {
 	rawData, err := json.Marshal(data)
 	if err != nil {
@@ -20,7 +19,6 @@ func MarshalEnvelope(msgType MessageType, data any) ([]byte, error) {
 	return json.Marshal(env)
 }
 
-// ParseEnvelope parses a JSON envelope from raw bytes.
 func ParseEnvelope(data []byte) (*Envelope, error) {
 	var env Envelope
 	if err := json.Unmarshal(data, &env); err != nil {

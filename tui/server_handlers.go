@@ -75,8 +75,7 @@ func (m *model) listenForStreamEvents() tea.Cmd {
 	}
 }
 
-// listenForPlaybackDone blocks on the server's playback-done channel and
-// returns a playbackStoppedMsg when the playlist finishes. No polling needed.
+// listenForPlaybackDone waits for the playlist to finish, then signals the TUI.
 func (m *model) listenForPlaybackDone() tea.Cmd {
 	return func() tea.Msg {
 		if m.audioServer == nil {
