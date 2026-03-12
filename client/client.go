@@ -17,8 +17,10 @@ import (
 )
 
 // Sentinel errors for clean shutdown handling.
-var ErrDisconnected = errors.New("disconnected")
-var ErrRejected = errors.New("rejected")
+var (
+	ErrDisconnected = errors.New("disconnected")
+	ErrRejected     = errors.New("rejected")
+)
 
 // AudioClient connects to a GopherCast server and plays audio.
 type AudioClient struct {
@@ -223,6 +225,9 @@ func (c *AudioClient) waitAndPlay() {
 	if sleepDuration > 0 {
 		time.Sleep(sleepDuration)
 	}
+	drift := time.Since(startTime)
+	fmt.Printf("[sync] target=%d sleep=%v drift=%v (positive=late, negative=early)\n",
+		c.startAtNs, sleepDuration, drift)
 
 	c.bufferMu.Lock()
 	buffered := c.buffer
