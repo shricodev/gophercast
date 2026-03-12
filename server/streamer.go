@@ -80,6 +80,9 @@ func (s *AudioServer) streamPlaylist() {
 	s.broadcastControl(protocol.MsgStopPlayback, protocol.StopPlaybackMsg{
 		Reason: "playlist_ended",
 	})
+
+	// Signal TUI that playback is done.
+	close(s.playbackDoneCh)
 }
 
 // streamTrack decodes an MP3 file to PCM and streams it at the correct bitrate.

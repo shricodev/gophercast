@@ -67,10 +67,23 @@ func (m *model) listenForStreamEvents() tea.Cmd {
 		if m.audioServer == nil {
 			return nil
 		}
+
 		return streamTickMsg{
 			elapsed: m.audioServer.PlaybackElapsed(),
 			track:   m.audioServer.CurrentTrackTitle(),
 		}
+	}
+}
+
+// listenForPlaybackDone blocks on the server's playback-done channel and
+// returns a playbackStoppedMsg when the playlist finishes. No polling needed.
+func (m *model) listenForPlaybackDone() tea.Cmd {
+	return func() tea.Msg {
+		if m.audioServer == nil {
+			return nil
+		}
+		<-m.audioServer.PlaybackDoneChan()
+		return playbackStoppedMsg{reason: "playlist_ended"}
 	}
 }
 

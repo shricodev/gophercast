@@ -161,7 +161,8 @@ func (c *AudioClient) handleControl(data []byte) error {
 		}
 		c.playing.Store(false)
 		c.sink.Close()
-		return nil
+		// Signal clean exit so the client shuts down gracefully.
+		return ErrDisconnected
 
 	case protocol.MsgTrackChange:
 		var msg protocol.TrackChangeMsg

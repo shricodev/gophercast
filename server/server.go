@@ -43,6 +43,7 @@ type AudioServer struct {
 	cancel context.CancelFunc
 
 	clientChangeCh chan []protocol.ClientInfo
+	playbackDoneCh chan struct{}
 
 	currentTrackTitle string
 	playbackStart     time.Time
@@ -62,6 +63,7 @@ func NewAudioServer(playlist *types.Playlist, port int, log *logger.Logger) *Aud
 		ctx:            ctx,
 		cancel:         cancel,
 		clientChangeCh: make(chan []protocol.ClientInfo, 1),
+		playbackDoneCh: make(chan struct{}),
 	}
 }
 
@@ -186,12 +188,20 @@ func (s *AudioServer) StartPlayback() error {
 func (s *AudioServer) Stop() error {
 	s.cancel()
 
-	s.broadcastControl(protocol.MsgStopPlayback, protocol.StopPlaybackMsg{
+	// Write stop message directly to each client's connection, then initiate
+	// a WebSocket close handshake. This bypasses the channel so there's no
+	// race between sending the message and closing the connection.
+	stopData, _ := protocol.MarshalEnvelope(protocol.MsgStopPlayback, protocol.StopPlaybackMsg{
 		Reason: "user_stopped",
 	})
 
 	s.mu.Lock()
 	for _, client := range s.clients {
+		client.conn.WriteMessage(websocket.TextMessage, stopData)
+		client.conn.WriteMessage(
+			websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseNormalClosure, "server stopped"),
+		)
 		client.conn.Close()
 	}
 	s.mu.Unlock()
@@ -207,6 +217,11 @@ func (s *AudioServer) Stop() error {
 // ClientChangeChan returns a channel that receives client list updates.
 func (s *AudioServer) ClientChangeChan() <-chan []protocol.ClientInfo {
 	return s.clientChangeCh
+}
+
+// PlaybackDoneChan returns a channel that is closed when the playlist finishes.
+func (s *AudioServer) PlaybackDoneChan() <-chan struct{} {
+	return s.playbackDoneCh
 }
 
 // Clients returns a thread-safe snapshot of connected clients.

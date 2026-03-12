@@ -124,13 +124,19 @@ func (m *model) handleClientListUpdate(msg clientListUpdateMsg) (tea.Model, tea.
 
 func (m *model) handlePlaybackStarted() (tea.Model, tea.Cmd) {
 	m.state = screenStreamTracks
-	return m, m.listenForStreamEvents()
+	return m, tea.Batch(m.listenForStreamEvents(), m.listenForPlaybackDone())
 }
 
 func (m *model) handlePlaybackStopped(msg playbackStoppedMsg) (tea.Model, tea.Cmd) {
 	m.currentTrackTitle = ""
 	m.streamElapsed = 0
-	return m, nil
+
+	if m.audioServer != nil {
+		m.audioServer.Stop()
+		m.audioServer = nil
+	}
+
+	return m, tea.Quit
 }
 
 func (m *model) handleStreamTick(msg streamTickMsg) (tea.Model, tea.Cmd) {
