@@ -34,22 +34,40 @@ type AudioClient struct {
 	buffer    []*protocol.AudioFrame
 	playing   atomic.Bool
 	closed    atomic.Bool
+
+	// drift correction state
+	drift          driftCorrector
+	sampleRate     int
+	bytesPerSample int
+
+	// audioLatencyNs is the estimated audio pipeline latency reported to the server.
+	audioLatencyNs int64
 }
 
 // NewAudioClient dials the server and sends a hello message.
-func NewAudioClient(serverURL, name string, sink AudioSink) (*AudioClient, error) {
+// latencyOverride, if positive, overrides the sink's estimated audio latency.
+func NewAudioClient(serverURL, name string, sink AudioSink, latencyOverride time.Duration) (*AudioClient, error) {
 	conn, _, err := websocket.DefaultDialer.Dial(serverURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("connect to server: %w", err)
 	}
 
-	c := &AudioClient{
-		conn: conn,
-		sink: sink,
-		name: name,
+	latency := sink.Latency()
+	if latencyOverride > 0 {
+		latency = latencyOverride
 	}
 
-	hello, err := protocol.MarshalEnvelope(protocol.MsgHello, protocol.HelloMsg{Name: name})
+	c := &AudioClient{
+		conn:           conn,
+		sink:           sink,
+		name:           name,
+		audioLatencyNs: latency.Nanoseconds(),
+	}
+
+	hello, err := protocol.MarshalEnvelope(protocol.MsgHello, protocol.HelloMsg{
+		Name:           name,
+		AudioLatencyNs: c.audioLatencyNs,
+	})
 	if err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("marshal hello: %w", err)
@@ -181,6 +199,8 @@ func (c *AudioClient) handleStartPlayback(msg protocol.StartPlaybackMsg) error {
 
 	c.startAtNs = msg.StartAtNs
 	c.nextSeq = 0
+	c.sampleRate = msg.SampleRate
+	c.bytesPerSample = msg.Channels * 2
 
 	c.bufferMu.Lock()
 	c.buffer = nil
@@ -191,7 +211,7 @@ func (c *AudioClient) handleStartPlayback(msg protocol.StartPlaybackMsg) error {
 			fmt.Printf("Error initializing audio: %v\n", err)
 			return
 		}
-		c.waitAndPlay()
+		c.waitAndPlay(msg.SampleRate, msg.Channels)
 	}()
 	return nil
 }
@@ -203,6 +223,8 @@ func (c *AudioClient) handleTrackChange(msg protocol.TrackChangeMsg) error {
 	c.playing.Store(false)
 	c.startAtNs = msg.StartAtNs
 	c.nextSeq = 0
+	c.sampleRate = msg.SampleRate
+	c.bytesPerSample = msg.Channels * 2
 
 	c.bufferMu.Lock()
 	c.buffer = nil
@@ -213,21 +235,22 @@ func (c *AudioClient) handleTrackChange(msg protocol.TrackChangeMsg) error {
 			fmt.Printf("Error re-initializing audio: %v\n", err)
 			return
 		}
-		c.waitAndPlay()
+		c.waitAndPlay(msg.SampleRate, msg.Channels)
 	}()
 	return nil
 }
 
 // waitAndPlay sleeps until startAtNs, then flushes the buffer and starts playing.
-func (c *AudioClient) waitAndPlay() {
+func (c *AudioClient) waitAndPlay(sampleRate, channels int) {
 	startTime := time.Unix(0, c.startAtNs)
 	sleepDuration := time.Until(startTime)
 	if sleepDuration > 0 {
 		time.Sleep(sleepDuration)
 	}
-	drift := time.Since(startTime)
-	fmt.Printf("[sync] target=%d sleep=%v drift=%v (positive=late, negative=early)\n",
-		c.startAtNs, sleepDuration, drift)
+
+	// Initialize drift corrector anchored to the target start time.
+	// This is the server's reference clock — all clients align to it.
+	c.drift.reset(sampleRate, channels, startTime)
 
 	c.bufferMu.Lock()
 	buffered := c.buffer
@@ -241,6 +264,7 @@ func (c *AudioClient) waitAndPlay() {
 
 	for _, frame := range buffered {
 		c.sink.Write(frame.Payload)
+		c.drift.written(len(frame.Payload))
 		c.nextSeq = frame.SeqNum + 1
 	}
 
@@ -261,7 +285,13 @@ func (c *AudioClient) handleAudioFrame(data []byte) {
 		return
 	}
 
-	c.sink.Write(frame.Payload)
+	// Apply drift correction periodically to keep playback aligned
+	// with the server's wall-clock timeline.
+	shouldCheck := frame.SeqNum%driftCheckInterval == 0
+	payload := c.drift.correct(frame.Payload, shouldCheck)
+
+	c.sink.Write(payload)
+	c.drift.written(len(payload))
 	c.nextSeq = frame.SeqNum + 1
 }
 

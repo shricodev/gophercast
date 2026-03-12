@@ -3,9 +3,14 @@ package client
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/ebitengine/oto/v3"
 )
+
+// defaultOtoLatency is the estimated audio pipeline latency for oto on Linux.
+// Includes oto internal buffer + OS audio subsystem (PipeWire/PulseAudio/ALSA).
+const defaultOtoLatency = 50 * time.Millisecond
 
 // SystemAudioSink plays PCM audio through the system audio output using oto.
 type SystemAudioSink struct {
@@ -70,6 +75,11 @@ func (s *SystemAudioSink) closePlayer() {
 		s.pipeR.Close()
 		s.pipeR = nil
 	}
+}
+
+// Latency returns the estimated audio output latency.
+func (s *SystemAudioSink) Latency() time.Duration {
+	return defaultOtoLatency
 }
 
 // Close stops playback and releases resources.

@@ -11,13 +11,14 @@ import (
 
 // Client represents a connected WebSocket client.
 type Client struct {
-	id        string
-	name      string
-	addr      string
-	conn      *websocket.Conn
-	sendCtrl  chan []byte // buffered, for JSON control messages
-	sendAudio chan []byte // buffered, for binary audio frames
-	server    *AudioServer
+	id             string
+	name           string
+	addr           string
+	conn           *websocket.Conn
+	sendCtrl       chan []byte // buffered, for JSON control messages
+	sendAudio      chan []byte // buffered, for binary audio frames
+	server         *AudioServer
+	audioLatencyNs int64 // client-reported audio pipeline latency
 }
 
 // readMessages reads messages from the WebSocket connection.
@@ -60,6 +61,7 @@ func (c *Client) handleTextMessage(data []byte) {
 			return
 		}
 		c.name = hello.Name
+		c.audioLatencyNs = hello.AudioLatencyNs
 		c.server.broadcastClientList()
 		c.server.pushClientChange()
 	}

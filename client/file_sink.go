@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 	"os"
+	"time"
 )
 
 // FileSink writes raw PCM audio data to a file.
@@ -32,6 +33,11 @@ func (s *FileSink) Write(p []byte) (int, error) {
 		return 0, fmt.Errorf("file sink not initialized")
 	}
 	return s.file.Write(p)
+}
+
+// Latency returns zero since file output has no playback latency.
+func (s *FileSink) Latency() time.Duration {
+	return 0
 }
 
 // Close closes the output file.

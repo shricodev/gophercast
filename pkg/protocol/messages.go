@@ -32,7 +32,8 @@ type Envelope struct {
 
 // HelloMsg is sent from client to server on connect.
 type HelloMsg struct {
-	Name string `json:"name"`
+	Name           string `json:"name"`
+	AudioLatencyNs int64  `json:"audio_latency_ns,omitempty"`
 }
 
 // ServerStateMsg is sent from server to client to indicate the current state.

@@ -46,30 +46,27 @@ func (s *AudioServer) streamPlaylist() {
 		if i > 0 {
 			leadTime = trackChangeLeadTime
 		}
-		startAtNs := time.Now().Add(leadTime).UnixNano()
 
-		if i == 0 {
-			s.broadcastControl(protocol.MsgStartPlayback, protocol.StartPlaybackMsg{
-				TrackTitle: track.Title,
-				SampleRate: sampleRate,
-				Channels:   channels,
-				StartAtNs:  startAtNs,
-			})
-		} else {
-			s.broadcastControl(protocol.MsgTrackChange, protocol.TrackChangeMsg{
-				TrackTitle: track.Title,
-				SampleRate: sampleRate,
-				Channels:   channels,
-				StartAtNs:  startAtNs,
-			})
+		msgType := protocol.MsgStartPlayback
+		if i > 0 {
+			msgType = protocol.MsgTrackChange
 		}
 
+		// Send per-client start times adjusted for audio pipeline latency.
+		// broadcastPlaybackStart adds maxLatency to the lead time so the
+		// highest-latency client still has enough buffering time.
+		s.broadcastPlaybackStart(msgType, track.Title, sampleRate, channels, leadTime)
+
+		// Compute the effective wait: leadTime + max client latency.
+		// This matches the target time calculation in broadcastPlaybackStart.
+		effectiveWait := leadTime + s.maxClientLatency()
+
 		s.mu.Lock()
-		s.playbackStart = time.Now().Add(leadTime)
+		s.playbackStart = time.Now().Add(effectiveWait)
 		s.mu.Unlock()
 
-		// Wait for the lead time before starting to stream
-		time.Sleep(leadTime)
+		// Wait for all clients to be ready before streaming.
+		time.Sleep(effectiveWait)
 
 		if err := s.streamTrack(&track, sampleRate, channels); err != nil {
 			s.logger.Error("error streaming track", "track", track.Title, "error", err)
@@ -142,6 +139,22 @@ func (s *AudioServer) streamTrack(track *types.Track, sampleRate, channels int) 
 	}
 
 	return nil
+}
+
+// maxClientLatency returns the maximum audio pipeline latency reported by
+// any connected client. Used to ensure the lead time accounts for the
+// slowest audio pipeline so all clients can start on time.
+func (s *AudioServer) maxClientLatency() time.Duration {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var maxNs int64
+	for _, client := range s.clients {
+		if client.audioLatencyNs > maxNs {
+			maxNs = client.audioLatencyNs
+		}
+	}
+	return time.Duration(maxNs)
 }
 
 // determinePCMParams opens an MP3 file and returns its sample rate and channel count.

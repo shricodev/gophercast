@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -17,6 +18,7 @@ var (
 	port       int
 	clientName string
 	outputFile string
+	latencyMs  int
 )
 
 // playCmd represents the play command.
@@ -54,7 +56,8 @@ Examples:
 
 		fmt.Printf("Connecting to %s as %q...\n", serverURL, name)
 
-		c, err := client.NewAudioClient(serverURL, name, sink)
+		latencyOverride := time.Duration(latencyMs) * time.Millisecond
+		c, err := client.NewAudioClient(serverURL, name, sink, latencyOverride)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Could not connect to server at %s\n", serverURL)
 			fmt.Fprintf(os.Stderr, "Make sure the server is running and the address is correct.\n")
@@ -103,6 +106,7 @@ func init() {
 	playCmd.Flags().IntVar(&port, "port", 8080, "Port of the server")
 	playCmd.Flags().StringVarP(&clientName, "name", "n", "", "Client display name (default: hostname)")
 	playCmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write raw PCM to file instead of playing audio")
+	playCmd.Flags().IntVar(&latencyMs, "latency", 0, "Audio pipeline latency in ms (overrides auto-detection, used for cross-device sync)")
 
 	playCmd.MarkFlagsRequiredTogether("host", "port")
 }
