@@ -132,7 +132,10 @@ func listenForDownloadEvents(events chan tea.Msg) tea.Cmd {
 }
 
 func Start() (types.Path, string, string) {
-	m := InitialModel()
+	m, err := InitialModel()
+	if err != nil {
+		log.Fatalf("failed to initialize: %v", err)
+	}
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	finalModel, err := p.Run()
@@ -143,6 +146,9 @@ func Start() (types.Path, string, string) {
 	mo := finalModel.(*model)
 	if mo.downloader != nil {
 		mo.downloader.Shutdown()
+	}
+	if mo.logger != nil {
+		mo.logger.Close()
 	}
 
 	return mo.dirToMp3Path, mo.youtubePlaylistURL, mo.youtubeURL

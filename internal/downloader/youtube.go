@@ -30,7 +30,10 @@ type DownloadConfig struct {
 }
 
 func DefaultConfig() *DownloadConfig {
-	homeDir, _ := os.UserHomeDir()
+	homeDir, err := os.UserHomeDir()
+	if err != nil || homeDir == "" {
+		homeDir = os.TempDir()
+	}
 	return &DownloadConfig{
 		OutputDir: types.Path(filepath.Join(homeDir, ".gophercast", "downloads")),
 		Quality:   "192",

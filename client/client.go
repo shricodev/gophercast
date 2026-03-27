@@ -186,50 +186,37 @@ func (c *AudioClient) handleControl(data []byte) error {
 	return nil
 }
 
-// handleStartPlayback kicks off sink init in a goroutine so the read loop stays unblocked.
-// oto context creation can be slow on some systems.
-func (c *AudioClient) handleStartPlayback(msg protocol.StartPlaybackMsg) error {
-	fmt.Printf("Now playing: %s\n", msg.TrackTitle)
+// preparePlayback sets up shared state for a new track and kicks off sink init
+// in a goroutine so the read loop stays unblocked (oto context creation can be slow).
+func (c *AudioClient) preparePlayback(title string, startAtNs int64, sampleRate, channels int) {
+	fmt.Printf("Now playing: %s\n", title)
 
-	c.startAtNs = msg.StartAtNs
+	c.playing.Store(false)
+	c.startAtNs = startAtNs
 	c.nextSeq = 0
-	c.sampleRate = msg.SampleRate
-	c.bytesPerSample = msg.Channels * 2
+	c.sampleRate = sampleRate
+	c.bytesPerSample = channels * 2
 
 	c.bufferMu.Lock()
 	c.buffer = nil
 	c.bufferMu.Unlock()
 
 	go func() {
-		if err := c.sink.Init(msg.SampleRate, msg.Channels); err != nil {
+		if err := c.sink.Init(sampleRate, channels); err != nil {
 			fmt.Printf("Error initializing audio: %v\n", err)
 			return
 		}
-		c.waitAndPlay(msg.SampleRate, msg.Channels)
+		c.waitAndPlay(sampleRate, channels)
 	}()
+}
+
+func (c *AudioClient) handleStartPlayback(msg protocol.StartPlaybackMsg) error {
+	c.preparePlayback(msg.TrackTitle, msg.StartAtNs, msg.SampleRate, msg.Channels)
 	return nil
 }
 
 func (c *AudioClient) handleTrackChange(msg protocol.TrackChangeMsg) error {
-	fmt.Printf("Now playing: %s\n", msg.TrackTitle)
-
-	c.playing.Store(false)
-	c.startAtNs = msg.StartAtNs
-	c.nextSeq = 0
-	c.sampleRate = msg.SampleRate
-	c.bytesPerSample = msg.Channels * 2
-
-	c.bufferMu.Lock()
-	c.buffer = nil
-	c.bufferMu.Unlock()
-
-	go func() {
-		if err := c.sink.Init(msg.SampleRate, msg.Channels); err != nil {
-			fmt.Printf("Error re-initializing audio: %v\n", err)
-			return
-		}
-		c.waitAndPlay(msg.SampleRate, msg.Channels)
-	}()
+	c.preparePlayback(msg.TrackTitle, msg.StartAtNs, msg.SampleRate, msg.Channels)
 	return nil
 }
 

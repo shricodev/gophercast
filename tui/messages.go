@@ -82,6 +82,10 @@ func (m *model) handleShutdownInitiated() (tea.Model, tea.Cmd) {
 		m.audioServer = nil
 	}
 
+	if m.logger != nil {
+		m.logger.Close()
+	}
+
 	return m, tea.Quit
 }
 

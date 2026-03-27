@@ -128,7 +128,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func InitialModel() *model {
+func InitialModel() (*model, error) {
 	initialScreenChoices := []list.Item{
 		item{title: singleFile, desc: "Pick a single mp3 audio file"},
 		item{title: directory, desc: "Pick a directory with mp3 files"},
@@ -179,7 +179,7 @@ func InitialModel() *model {
 
 	logDir := types.Path(filepath.Join(homeDir, ".gophercast", "logs"))
 	if err := utils.EnsureDir(logDir); err != nil {
-		panic(fmt.Sprintf("failed to create log directory: %v", err))
+		return nil, fmt.Errorf("failed to create log directory: %w", err)
 	}
 
 	logger, err := logger.New(logger.Config{
@@ -188,7 +188,7 @@ func InitialModel() *model {
 		TimeFormat: "15:04:05",
 	})
 	if err != nil {
-		panic(fmt.Sprintf("failed to initialize logger: %v", err))
+		return nil, fmt.Errorf("failed to initialize logger: %w", err)
 	}
 
 	return &model{
@@ -213,7 +213,7 @@ func InitialModel() *model {
 		serverPort: 8080,
 
 		logger: logger,
-	}
+	}, nil
 }
 
 func shutdown() tea.Cmd {
