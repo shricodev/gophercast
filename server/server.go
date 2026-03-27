@@ -30,8 +30,6 @@ type AudioServer struct {
 	trackIndex int
 
 	clients      map[string]*Client
-	register     chan *Client
-	unregister   chan *Client
 	nextClientID atomic.Uint64
 
 	httpServer *http.Server
@@ -55,8 +53,6 @@ func NewAudioServer(playlist *types.Playlist, port int, log *logger.Logger) *Aud
 		state:          protocol.StateLobby,
 		playlist:       playlist,
 		clients:        make(map[string]*Client),
-		register:       make(chan *Client),
-		unregister:     make(chan *Client),
 		port:           port,
 		logger:         log,
 		ctx:            ctx,
@@ -79,7 +75,6 @@ func (s *AudioServer) ListenAndServe() error {
 
 	s.httpServer = &http.Server{Handler: mux}
 
-	go s.runHub()
 	go func() {
 		if err := s.httpServer.Serve(ln); err != nil && err != http.ErrServerClosed {
 			s.logger.Error("http server error", "error", err)
@@ -90,51 +85,45 @@ func (s *AudioServer) ListenAndServe() error {
 	return nil
 }
 
-// runHub handles client register/unregister events in a dedicated goroutine.
-func (s *AudioServer) runHub() {
-	for {
-		select {
-		case <-s.ctx.Done():
-			return
-
-		case client := <-s.register:
-			s.mu.Lock()
-			if s.state == protocol.StatePlaying {
-				s.mu.Unlock()
-				// write directly to the wire since the writeMessages goroutine
-				// might not be running yet
-				rejectData, _ := protocol.MarshalEnvelope(protocol.MsgReject, protocol.RejectMsg{
-					Reason: "playback already in progress, connect during lobby",
-				})
-				client.conn.WriteMessage(websocket.TextMessage, rejectData)
-				client.conn.WriteMessage(
-					websocket.CloseMessage,
-					websocket.FormatCloseMessage(websocket.CloseNormalClosure, "rejected"),
-				)
-				client.conn.Close()
-				continue
-			}
-			s.clients[client.id] = client
-			s.mu.Unlock()
-
-			s.logger.ClientConnected(client.id, client.addr)
-			s.broadcastClientList()
-			s.pushClientChange()
-
-		case client := <-s.unregister:
-			s.mu.Lock()
-			if _, ok := s.clients[client.id]; ok {
-				delete(s.clients, client.id)
-				close(client.sendCtrl)
-				close(client.sendAudio)
-			}
-			s.mu.Unlock()
-
-			s.logger.ClientDisconnected(client.id, "disconnected")
-			s.broadcastClientList()
-			s.pushClientChange()
-		}
+// registerClient adds a client to the server, or rejects it if playback is in progress.
+// Returns true if the client was accepted.
+func (s *AudioServer) registerClient(client *Client) bool {
+	s.mu.Lock()
+	if s.state == protocol.StatePlaying {
+		s.mu.Unlock()
+		rejectData, _ := protocol.MarshalEnvelope(protocol.MsgReject, protocol.RejectMsg{
+			Reason: "playback already in progress, connect during lobby",
+		})
+		client.conn.WriteMessage(websocket.TextMessage, rejectData)
+		client.conn.WriteMessage(
+			websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseNormalClosure, "rejected"),
+		)
+		client.conn.Close()
+		return false
 	}
+	s.clients[client.id] = client
+	s.mu.Unlock()
+
+	s.logger.ClientConnected(client.id, client.addr)
+	s.broadcastClientList()
+	s.pushClientChange()
+	return true
+}
+
+// unregisterClient removes a client from the server and cleans up its channels.
+func (s *AudioServer) unregisterClient(client *Client) {
+	s.mu.Lock()
+	if _, ok := s.clients[client.id]; ok {
+		delete(s.clients, client.id)
+		close(client.sendCtrl)
+		close(client.sendAudio)
+	}
+	s.mu.Unlock()
+
+	s.logger.ClientDisconnected(client.id, "disconnected")
+	s.broadcastClientList()
+	s.pushClientChange()
 }
 
 func (s *AudioServer) handleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -154,7 +143,9 @@ func (s *AudioServer) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		server:    s,
 	}
 
-	s.register <- client
+	if !s.registerClient(client) {
+		return
+	}
 
 	go client.readMessages()
 	go client.writeMessages()

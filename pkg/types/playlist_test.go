@@ -60,20 +60,20 @@ func TestPlaylistCurrent(t *testing.T) {
 func TestPlaylistNext(t *testing.T) {
 	p := newTestPlaylist(3)
 
-	// No track playing — returns first
+	// No track playing
 	next := p.Next()
 	if next == nil || next.Title != (*p)[0].Title {
 		t.Fatal("expected first track when nothing is playing")
 	}
 
-	// Playing first — returns second
+	// Playing first
 	p.MarkIsPlaying(0)
 	next = p.Next()
 	if next == nil || next.Title != (*p)[1].Title {
 		t.Fatal("expected second track")
 	}
 
-	// Playing last — wraps to first
+	// Playing last
 	p.MarkIsPlaying(2)
 	next = p.Next()
 	if next == nil || next.Title != (*p)[0].Title {
@@ -84,20 +84,20 @@ func TestPlaylistNext(t *testing.T) {
 func TestPlaylistPrevious(t *testing.T) {
 	p := newTestPlaylist(3)
 
-	// No track playing — returns last
+	// No track playing
 	prev := p.Previous()
 	if prev == nil || prev.Title != (*p)[2].Title {
 		t.Fatal("expected last track when nothing is playing")
 	}
 
-	// Playing last — returns second
+	// Playing last
 	p.MarkIsPlaying(2)
 	prev = p.Previous()
 	if prev == nil || prev.Title != (*p)[1].Title {
 		t.Fatal("expected second track")
 	}
 
-	// Playing first — wraps to last
+	// Playing first
 	p.MarkIsPlaying(0)
 	prev = p.Previous()
 	if prev == nil || prev.Title != (*p)[2].Title {

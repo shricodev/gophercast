@@ -23,7 +23,7 @@ type Client struct {
 
 func (c *Client) readMessages() {
 	defer func() {
-		c.server.unregister <- c
+		c.server.unregisterClient(c)
 		c.conn.Close()
 	}()
 

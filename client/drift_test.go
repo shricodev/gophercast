@@ -131,7 +131,7 @@ func TestDriftCorrectorMaxCorrection(t *testing.T) {
 
 func TestDriftCorrectorUninitializedPassthrough(t *testing.T) {
 	d := &driftCorrector{}
-	// Not reset — sampleRate=0, startTime is zero
+	// Not reset. sampleRate=0, startTime is zero
 
 	payload := make([]byte, 4096)
 	result := d.correct(payload, true)
