@@ -10,10 +10,6 @@ import (
 )
 
 func (m *model) View() string {
-	if m.err != nil {
-		return docStyle.Render("Error: " + m.err.Error())
-	}
-
 	bannerPath := filepath.Join("assets", "banner.txt")
 	content, err := os.ReadFile(bannerPath)
 	if err != nil {
@@ -28,6 +24,16 @@ func (m *model) View() string {
 		Render("Built with 🤍 by Shrijal Acharya @shricodev")
 
 	header := color.CyanString(lipgloss.JoinVertical(lipgloss.Left, string(content), message))
+
+	if m.err != nil {
+		errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
+		errBody := lipgloss.JoinVertical(lipgloss.Left,
+			errStyle.Render("Error: "+m.err.Error()),
+			"",
+			helpStyle.Render("Esc: Dismiss and return to menu | Ctrl+C: Quit"),
+		)
+		return docStyle.Render(lipgloss.JoinVertical(lipgloss.Left, header, "", errBody, "", ""))
+	}
 
 	var body string
 	switch m.state {

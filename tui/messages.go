@@ -5,6 +5,8 @@ import (
 	"net"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/shricodev/gophercast/internal/downloader"
 )
 
 func (m *model) handleCustomMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -91,11 +93,16 @@ func (m *model) handleShutdownInitiated() (tea.Model, tea.Cmd) {
 
 func (m *model) handleError(msg errMsg) (tea.Model, tea.Cmd) {
 	m.err = msg
-	if m.downloader != nil {
-		m.downloader.Shutdown()
-		m.downloader = nil
-	}
-	return m, tea.Quit
+	m.logger.Error("download error", "error", msg.err)
+
+	// reset state so the user can pick a different source....
+	m.youtubeURL = ""
+	m.youtubePlaylistURL = ""
+	m.dirToMp3Path = ""
+	m.showDownloadProgress = false
+	m.downloadProgress = &downloader.DownloadProgress{}
+	m.state = screenMenu
+	return m, nil
 }
 
 func (m *model) handleServerStarted(msg serverStartedMsg) (tea.Model, tea.Cmd) {

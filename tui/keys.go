@@ -264,6 +264,11 @@ func (m *model) handleDKey() (tea.Model, tea.Cmd) {
 }
 
 func (m *model) handleEscKey() (tea.Model, tea.Cmd) {
+	if m.err != nil {
+		m.err = nil
+		return m, nil
+	}
+
 	switch m.state {
 	case screenPickDir, screenInputYoutube, screenInputYoutubePlaylist, screenChooseTracksOptions:
 		m.state = screenMenu
