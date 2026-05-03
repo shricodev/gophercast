@@ -20,7 +20,7 @@ func (m *model) handleWindowSizeMsg(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	m.selectedTracksList.SetSize(listWidth, listHeight)
 
 	fpHeight := max(msg.Height-ver-headerHeight-4, 5)
-	m.filePicker.Height = fpHeight
+	m.filePicker.SetHeight(fpHeight)
 
 	return m, nil
 }

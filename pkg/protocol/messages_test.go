@@ -80,4 +80,3 @@ func TestParseEnvelopeInvalid(t *testing.T) {
 		})
 	}
 }
-

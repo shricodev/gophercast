@@ -152,7 +152,7 @@ func InitialModel() (*model, error) {
 	fp := filepicker.New()
 	fp.DirAllowed = true
 	fp.FileAllowed = false
-	fp.Height = 20
+	fp.SetHeight(20)
 
 	// fp.ShowHidden is set to true because by default we save the files in the
 	// ~/.gophercast/downloads directory.
@@ -252,8 +252,10 @@ type item struct {
 	selected    bool
 }
 
-func (i item) Title() string       { return i.title }
+func (i item) Title() string { return i.title }
+
 func (i item) Description() string { return i.desc }
+
 func (i item) FilterValue() string { return i.title }
 
 type (
@@ -263,14 +265,6 @@ type (
 	downloadCompleteMsg struct {
 		tracks *types.Playlist
 		path   types.Path
-	}
-	downloadVideoResult struct {
-		track types.Track
-		err   error
-	}
-	downloadPlaylistResult struct {
-		tracks *types.Playlist
-		err    error
 	}
 	shutdownInitiatedMsg struct{}
 	serverErrorMsg       struct {
@@ -282,10 +276,9 @@ type (
 	clientListUpdateMsg struct {
 		clients []protocol.ClientInfo
 	}
-	playbackStartedMsg       struct{}
-	playbackStoppedMsg       struct{ reason string }
-	allClientsDisconnectedMsg struct{}
-	streamTickMsg            struct {
+	playbackStartedMsg struct{}
+	playbackStoppedMsg struct{ reason string }
+	streamTickMsg      struct {
 		elapsed time.Duration
 		track   string
 	}

@@ -97,15 +97,3 @@ func (m *model) findAvailablePort(startPort int) (int, error) {
 
 	return 0, fmt.Errorf("no available ports found")
 }
-
-func (m *model) stopAudioServer() tea.Cmd {
-	return func() tea.Msg {
-		if m.audioServer != nil {
-			if err := m.audioServer.Stop(); err != nil {
-				m.logger.Error("error stopping the server", "error", err)
-			}
-			m.audioServer = nil
-		}
-		return nil
-	}
-}

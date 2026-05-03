@@ -42,21 +42,6 @@ func (s *AudioServer) broadcastAudioFrame(frame *protocol.AudioFrame) {
 	}
 }
 
-// sendControlTo sends a control message to a single client.
-func (s *AudioServer) sendControlTo(client *Client, msgType protocol.MessageType, data any) {
-	envelope, err := protocol.MarshalEnvelope(msgType, data)
-	if err != nil {
-		s.logger.Error("failed to marshal control message", "type", string(msgType), "error", err)
-		return
-	}
-
-	select {
-	case client.sendCtrl <- envelope:
-	default:
-		s.logger.Warn("dropping control message for slow client", "client", client.id)
-	}
-}
-
 // broadcastPlaybackStart sends each client a personalized start time.
 // The goal is to have sound come out of every speaker at the same moment,
 // so clients with higher latency get an earlier start_at_ns.

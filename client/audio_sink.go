@@ -63,7 +63,6 @@ func (s *SystemAudioSink) closePlayer() {
 		s.pipeW = nil
 	}
 	if s.player != nil {
-		s.player.Close()
 		s.player = nil
 	}
 	if s.pipeR != nil {

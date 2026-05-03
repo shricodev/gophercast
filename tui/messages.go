@@ -26,7 +26,7 @@ func (m *model) handleCustomMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case playbackStartedMsg:
 		return m.handlePlaybackStarted()
 	case playbackStoppedMsg:
-		return m.handlePlaybackStopped(msg)
+		return m.handlePlaybackStopped()
 	case streamTickMsg:
 		return m.handleStreamTick(msg)
 	case errMsg:
@@ -137,7 +137,7 @@ func (m *model) handlePlaybackStarted() (tea.Model, tea.Cmd) {
 	return m, tea.Batch(m.listenForStreamEvents(), m.listenForPlaybackDone())
 }
 
-func (m *model) handlePlaybackStopped(msg playbackStoppedMsg) (tea.Model, tea.Cmd) {
+func (m *model) handlePlaybackStopped() (tea.Model, tea.Cmd) {
 	m.currentTrackTitle = ""
 	m.streamElapsed = 0
 
