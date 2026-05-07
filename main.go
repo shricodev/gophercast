@@ -20,14 +20,4 @@ limitations under the License.
 
 func main() {
 	cmd.Execute()
-
-	// filename := "audiofile.wav"
-	//
-	// server := server.NewAudioServer(filename)
-	// go server.Run()
-	//
-	// http.HandleFunc("/ws", server.HandleWebSocket)
-	// if err := http.ListenAndServe(":8080", nil); err != nil {
-	// 	fmt.Println("error listening on the server:", err)
-	// }
 }
